@@ -51,7 +51,7 @@ $ python3 python/registration.py
 @inproceedings{quenzel2021mars,
   title={{Real-time Multi-Adaptive-Resolution-Surfel 6D LiDAR Odometry using Continuous-time Trajectory Optimization}},
   author={Quenzel, Jan and Behnke, Sven},
-  booktitle={n Proceedings of IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  booktitle={Proceedings of IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
   year={2021}
 }
 ```
