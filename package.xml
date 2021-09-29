@@ -1,0 +1,15 @@
+<package format="2">
+   <name>lidar_mars_registration</name>
+   <description>lidar MARS registration</description>
+   <version>0.0.1</version>
+   <license>BSD 3-clause</license>
+   <maintainer email="quenzel@ais.uni-bonn.de">Jan Quenzel</maintainer> 
+   <buildtool_depend>catkin</buildtool_depend>
+   <depend>rosbag_storage</depend>
+   <depend>nav_msgs</depend>
+   <depend>sensor_msgs</depend>
+   <depend>std_srvs</depend>
+   <depend>roscpp</depend>
+   <depend>tf2_msgs</depend>
+   <depend>tf2_ros</depend>
+</package>

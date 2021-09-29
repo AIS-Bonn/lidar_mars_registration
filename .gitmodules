@@ -1,0 +1,18 @@
+[submodule "deps/abseil-cpp"]
+	path = deps/abseil-cpp
+	url = https://github.com/abseil/abseil-cpp.git
+[submodule "deps/Sophus"]
+	path = deps/Sophus
+	url = https://github.com/strasdat/Sophus.git
+[submodule "deps/tracy"]
+	path = deps/tracy
+	url = https://github.com/wolfpld/tracy.git
+[submodule "deps/Configuru"]
+	path = deps/Configuru
+	url = https://github.com/RaduAlexandru/Configuru.git
+[submodule "deps/pybind11"]
+	path = deps/pybind11
+	url = https://github.com/pybind/pybind11.git
+[submodule "deps/loguru"]
+	path = deps/loguru
+	url = https://github.com/RaduAlexandru/loguru.git
