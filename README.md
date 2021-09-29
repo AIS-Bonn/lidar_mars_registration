@@ -31,7 +31,7 @@ $ catkin build lidar_mars_registration
 $ rosrun lidar_mars_registration lidar_mars_registration_node
 ```
 ### Build with EasyPBR: 
-To build with better visualization, you must have first installed [EasyPBR] ( https://github.com/JanQuenzel/easy_pbr ).<br>
+To build with better visualization, you must have first installed [EasyPBR](https://github.com/JanQuenzel/easy_pbr).<br>
 Afterwards this example can be build with 
 ```sh
 $ make
@@ -57,9 +57,7 @@ $ python3 python/registration.py
 ```
 
 ### Comparison
-The modified A-LOAM and floam used within our paper comparison can be found in the following forks:<br>
- [floam](https://github.com/JanQuenzel/floam)<br>
- [A-LOAM](https://github.com/JanQuenzel/A-LOAM)<br>
+The modified A-LOAM and floam used within our paper comparison can be found in the following forks: [floam](https://github.com/JanQuenzel/floam) and [A-LOAM](https://github.com/JanQuenzel/A-LOAM)<br>
 For SuMa we first converted the bag files into KITTI binary format and used the original implementation by Behley and Stachniss: [SuMa](https://github.com/jbehley/SuMa)
 
 ### License
