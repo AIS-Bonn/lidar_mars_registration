@@ -57,7 +57,7 @@ geometry_msgs::TransformStamped BagReader::getStaticTransform ( const std::strin
     try{
         laser_link = tfBufferPtr_->lookupTransform( target, source, m_min_time_stamp + ros::Duration((m_max_time_stamp - m_min_time_stamp ).toSec()/2) );
     }
-    catch (tf2::TransformException ex){
+    catch (tf2::TransformException & ex){
         ROS_ERROR_STREAM(ex.what());
         ros::Duration(1.0).sleep();
     }
@@ -131,7 +131,7 @@ void BagReader::readCloudsWithPoses( std::vector<sensor_msgs::PointCloud2::Const
             clouds.emplace_back(cloudPtr);
             poses.emplace_back(tfTransform);
         }
-        catch (tf2::TransformException ex){
+        catch (tf2::TransformException & ex){
             ROS_ERROR_STREAM_THROTTLE(1,ex.what());
             continue;
         }
@@ -157,7 +157,7 @@ void BagReader::readPoses( std::vector<ros::Time> & timestamps, std::vector<geom
             poses.emplace_back(tfTransform);
             timestamps.emplace_back(stamp);
         }
-        catch (tf2::TransformException ex){
+        catch (tf2::TransformException & ex){
             LOG(INFO) << "ups... " << stamp.toNSec() << " Err: "<< ex.what();
             continue;
         }

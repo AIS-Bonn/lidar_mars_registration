@@ -147,6 +147,7 @@ private:
     int m_num_scan_lines = 128;
     int m_max_scan_line = 128;
     int m_num_scan_columns = 1024;
+    int m_num_scans_per_second = 20;
     std::string m_corrected_sensor_frame = "";
     std::string m_corrected_baselink_frame = "";
     std::string m_baselink_gps_frame = "";

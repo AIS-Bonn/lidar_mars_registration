@@ -138,6 +138,7 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
     m_max_scan_line = dyn_config["max_scan_line"];
     m_num_scan_lines = dyn_config["num_scan_lines"];
     m_num_scan_columns = dyn_config["num_scan_columns"];
+    m_num_scans_per_second = dyn_config["num_scans_per_second"];
 
     m_compensate_orientation = dyn_config["compensate_orientation"];
     m_organized_scans = dyn_config["organized_scans"];
@@ -197,11 +198,11 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
         m_validityTimeOffsetTF = dyn_config["tf_validity_time_offset"];
         m_use_tf_for_field_baselink = dyn_config["use_tf_for_field_baselink"];
         const std::string imu_topic = (std::string)dyn_config["imu_topic"];
-        m_imu_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(imu_topic, 1, &MarsSplineRegistrationAdaptor::imu_msgs_ros, this));
+        m_imu_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(imu_topic, 50, &MarsSplineRegistrationAdaptor::imu_msgs_ros, this, ros::TransportHints().tcpNoDelay()));
         const std::string cloud_topic = (std::string)dyn_config["cloud_topic"];
-        m_scan_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(cloud_topic, 1, &MarsSplineRegistrationAdaptor::cloud_msgs_ros, this));
+        m_scan_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(cloud_topic, 1, &MarsSplineRegistrationAdaptor::cloud_msgs_ros, this, ros::TransportHints().tcpNoDelay()));
         const std::string gps_topic = (std::string)dyn_config["gps_topic"];
-        m_gps_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(gps_topic, 1, &MarsSplineRegistrationAdaptor::gps_msgs_ros, this));
+        m_gps_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(gps_topic, 10, &MarsSplineRegistrationAdaptor::gps_msgs_ros, this, ros::TransportHints().tcpNoDelay()));
         const std::string map_topic = (std::string)dyn_config["map_topic"];
         m_map_publisher = std::make_shared<ros::Publisher>( pnh.advertise<sensor_msgs::PointCloud2>(map_topic, 1));
         const std::string scene_topic = (std::string)dyn_config["scene_topic"];
@@ -264,15 +265,15 @@ void MarsSplineRegistrationAdaptor::gps_msgs_ros ( const nav_msgs::Odometry::Con
 }
 
 template <typename Msg, typename MsgsPtr>
-MsgsPtr getCurrentMsgs( const MsgsPtr & m_msgs, std::mutex & msgMutex, const ros::Time & last_cloud_stamp, const ros::Time & current_cloud_stamp )
+MsgsPtr getCurrentMsgs( const MsgsPtr & m_msgs, std::mutex & msgMutex, const int64_t & last_cloud_stamp, const int64_t & current_cloud_stamp )
 {
     MsgsPtr msgs = std::make_shared<Msg>();
     {
         std::unique_lock<std::mutex> lock ( msgMutex );
         if ( m_msgs )
         {
-            const auto it_beg = m_msgs->lower_bound(last_cloud_stamp.toNSec());
-            const auto it_end = m_msgs->upper_bound(current_cloud_stamp.toNSec());
+            const auto it_beg = m_msgs->lower_bound(last_cloud_stamp);
+            const auto it_end = m_msgs->upper_bound(current_cloud_stamp);
             //LOG(INFO) << "grabbing msgs: " << std::distance(it_beg, it_end)<< " end? " << (it_beg == m_msgs->end()) << " " << (it_end == m_msgs->end()) << " s: " << m_msgs->size();
             if ( it_beg != m_msgs->end() )
             {
@@ -291,13 +292,25 @@ MsgsPtr getCurrentMsgs( const MsgsPtr & m_msgs, std::mutex & msgMutex, const ros
 void MarsSplineRegistrationAdaptor::cloud_msgs_ros ( const sensor_msgs::PointCloud2::ConstPtr& inputCloud )
 {
     if ( ! inputCloud ) return;
-    static ros::Time last_cloud_stamp;
-    const ros::Time current_cloud_stamp = inputCloud->header.stamp;
+    static int64_t last_cloud_stamp = inputCloud->header.stamp.toNSec();
+    const int64_t current_cloud_stamp = inputCloud->header.stamp.toNSec();
+    static int64_t last_seq_id = inputCloud->header.seq;
+    const int64_t cur_seq_id = inputCloud->header.seq;
+
+    const int64_t dt = TimeConversion::to_ns(1./(m_num_scans_per_second));
+    const int64_t last_cloud_stamp_dt = last_cloud_stamp + 1.05*dt;
+    //LOG(INFO) << "lcs: " << last_cloud_stamp << " dt: " << dt << " lcs+dt: " << last_cloud_stamp_dt;
+    if ( last_cloud_stamp_dt < current_cloud_stamp ) // for orientation compensation of os_lidars
+    {
+       last_cloud_stamp = current_cloud_stamp - dt;
+    }
+
     ImuMsgsPtr imu_msgs = getCurrentMsgs<ImuMsgs,ImuMsgsPtr>( m_imu_msgs, imuMsgsMutex, last_cloud_stamp, current_cloud_stamp );
     GpsMsgsPtr gps_msgs = getCurrentMsgs<GpsMsgs,GpsMsgsPtr>( m_gps_msgs, gpsMsgsMutex, last_cloud_stamp, current_cloud_stamp );
 
     register_cloud_ros(inputCloud, imu_msgs, gps_msgs );
-    last_cloud_stamp = inputCloud->header.stamp;
+    last_cloud_stamp = current_cloud_stamp;
+    last_seq_id = cur_seq_id;
 }
 
 void MarsSplineRegistrationAdaptor::imu_msgs ( const std::shared_ptr<sensor_msgs::Imu> & imu_msg )
