@@ -191,7 +191,6 @@ private:
     PublisherPtr m_scan_publisher = nullptr;
     PublisherPtr m_scan_downsampled_publisher = nullptr;
     PublisherPtr m_odom_publisher = nullptr;
-    PublisherPtr m_local_map_publisher = nullptr;
     SubscriberPtr m_imu_subscriber = nullptr;
     SubscriberPtr m_scan_subscriber = nullptr;
     SubscriberPtr m_gps_subscriber = nullptr;

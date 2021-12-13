@@ -214,9 +214,6 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
         const std::string odom_topic = (std::string)dyn_config["odom_topic"];
         m_odom_publisher = std::make_shared<ros::Publisher>( pnh.advertise<nav_msgs::Odometry>(odom_topic, 1));
 
-        const std::string local_map_topic = (std::string)dyn_config["local_map_topic"];
-        m_local_map_publisher = std::make_shared<ros::Publisher>( pnh.advertise<sensor_msgs::PointCloud2>(local_map_topic, 1));
-
         m_corrected_sensor_frame = (std::string)dyn_config["corrected_sensor_frame"];
         m_corrected_baselink_frame = (std::string)dyn_config["corrected_baselink_frame"];
         m_baselink_gps_frame = (std::string)dyn_config["baselink_gps_frame"];
@@ -579,7 +576,8 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     if ( ! m_use_tf_for_field_baselink )
         gps_transform_world_baselink.transform = sophusToTransform(Sophus::SE3d());
     try{
-        gps_transform_world_baselink = m_tf_buffer->lookupTransform( m_world_frame, m_baselink_gps_frame, ros::Time(0) );
+        if ( m_use_tf_for_field_baselink )
+            gps_transform_world_baselink = m_tf_buffer->lookupTransform( m_world_frame, m_baselink_gps_frame, ros::Time(0) );
         transform_baselink_sensor = m_tf_buffer->lookupTransform( m_baselink_frame, m_sensor_frame, ros::Time(0) );
     }
     catch (tf2::TransformException ex){

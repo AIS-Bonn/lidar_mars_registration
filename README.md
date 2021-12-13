@@ -30,6 +30,11 @@ $ catkin build lidar_mars_registration
 ```sh
 $ rosrun lidar_mars_registration lidar_mars_registration_node
 ```
+This runs with parameters specified in ./config/live.cfg If you want to run it with a specific parameter set (multiple defined in config subfolder), then use the following:
+```sh
+$ rosrun lidar_mars_registration lidar_mars_registration_node _config_file_rel:="./config/urban_loco.cfg"
+```
+Make sure, that "use_ros" is set to true for the registration_adaptor.
 ### Build with EasyPBR: 
 To build with better visualization, you must have first installed [EasyPBR](https://github.com/JanQuenzel/easy_pbr).<br>
 Afterwards this example can be build with 
@@ -45,7 +50,7 @@ or
 ```sh
 $ python3 python/registration.py
 ```
-
+Make sure, that "use_ros" is set to false for the registration_adaptor.
 ### Citation
 ```
 @inproceedings{quenzel2021mars,
