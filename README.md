@@ -32,7 +32,7 @@ $ rosrun lidar_mars_registration lidar_mars_registration_node
 ```
 This runs with parameters specified in ./config/live.cfg If you want to run it with a specific parameter set (multiple defined in config subfolder), then use the following:
 ```sh
-$ rosrun lidar_mars_registration lidar_mars_registration_node _config_file_rel:="./config/urban_loco.cfg"
+$ rosrun lidar_mars_registration lidar_mars_registration_node _config_file_rel:="./config/urban_loco_ca.cfg"
 ```
 Make sure, that "use_ros" is set to true for the registration_adaptor.
 ### Build with EasyPBR: 

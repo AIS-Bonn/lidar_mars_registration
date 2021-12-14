@@ -197,10 +197,12 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
         ros::NodeHandle pnh("~");
         m_validityTimeOffsetTF = dyn_config["tf_validity_time_offset"];
         m_use_tf_for_field_baselink = dyn_config["use_tf_for_field_baselink"];
+        m_use_tf_for_baselink_sensor = dyn_config["use_tf_for_baselink_sensor"];
         const std::string imu_topic = (std::string)dyn_config["imu_topic"];
         m_imu_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(imu_topic, 50, &MarsSplineRegistrationAdaptor::imu_msgs_ros, this, ros::TransportHints().tcpNoDelay()));
         const std::string cloud_topic = (std::string)dyn_config["cloud_topic"];
         m_scan_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(cloud_topic, 1, &MarsSplineRegistrationAdaptor::cloud_msgs_ros, this, ros::TransportHints().tcpNoDelay()));
+        LOG(INFO) << "Subscribed for clouds to topic: " << cloud_topic;
         const std::string gps_topic = (std::string)dyn_config["gps_topic"];
         m_gps_subscriber = std::make_shared<ros::Subscriber>(nh.subscribe(gps_topic, 10, &MarsSplineRegistrationAdaptor::gps_msgs_ros, this, ros::TransportHints().tcpNoDelay()));
         const std::string map_topic = (std::string)dyn_config["map_topic"];
@@ -236,6 +238,7 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
             m_run_vis_run = true;
         }
     }
+    LOG(INFO) << "Initialized. Waiting for data...";
 }
 
 bool MarsSplineRegistrationAdaptor::was_keyframe ( ) const
@@ -588,10 +591,13 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     geometry_msgs::TransformStamped transform_baselink_sensor;
     if ( ! m_use_tf_for_field_baselink )
         gps_transform_world_baselink.transform = sophusToTransform(Sophus::SE3d());
+    if ( ! m_use_tf_for_baselink_sensor )
+        transform_baselink_sensor.transform = sophusToTransform(Sophus::SE3d());
     try{
         if ( m_use_tf_for_field_baselink )
             gps_transform_world_baselink = m_tf_buffer->lookupTransform( m_world_frame, m_baselink_gps_frame, ros::Time(0) );
-        transform_baselink_sensor = m_tf_buffer->lookupTransform( m_baselink_frame, m_sensor_frame, ros::Time(0) );
+        if ( m_use_tf_for_baselink_sensor )
+            transform_baselink_sensor = m_tf_buffer->lookupTransform( m_baselink_frame, m_sensor_frame, ros::Time(0) );
     }
     catch (tf2::TransformException ex){
         ROS_ERROR_STREAM_THROTTLE(1,ex.what());

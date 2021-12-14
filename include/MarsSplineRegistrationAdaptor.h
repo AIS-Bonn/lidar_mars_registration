@@ -141,6 +141,7 @@ private:
 
     bool m_center_transform = true;
     bool m_use_tf_for_field_baselink = true;
+    bool m_use_tf_for_baselink_sensor = true;
     uint16_t m_scan_id = 0;
     double m_min_range = 1.;
     double m_validityTimeOffsetTF = 0.1;
