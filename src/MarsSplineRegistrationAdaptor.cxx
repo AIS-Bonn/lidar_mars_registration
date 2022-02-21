@@ -444,7 +444,8 @@ void MarsSplineRegistrationAdaptor::showPoses ( const Sophus::SE3d & cur_pose, c
     LOG(INFO) << "GPS: " << cur_pose.params().transpose();
 #endif
 
-    static std::ofstream regPosesFile ("./reg_poses.txt");
+    //static std::ofstream regPosesFile ("./reg_poses.txt");
+    static std::ofstream regPosesFile ("./lidar_mars_registration_after_map_poses.txt");
     static std::ofstream gpsPosesFile ("./gps_poses.txt");
 
     if ( gpsPosesFile.is_open() )
@@ -701,6 +702,17 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
             interp_pose_map_baselink;
     // TODO: add interpolation offset on the time stamp
     publishOdom ( m_odom_publisher, sceneCloud->m_stamp, m_map_frame, m_corrected_baselink_frame, interp_pose_firstMap_baselink, velocity_baselink, cov );
+
+    {
+        static std::ofstream regPosesFile ("./lidar_mars_registration_after_map_poses.txt");
+        if ( regPosesFile.is_open() )
+        {
+            const Eigen::Vector3d t = interp_pose_firstMap_baselink.translation();
+            const Eigen::Quaterniond q = interp_pose_firstMap_baselink.unit_quaternion();
+            regPosesFile << sceneCloud->m_stamp << " " << t.x() << " " << t.y() << " " << t.z() << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() <<"\n";
+        }
+    }
+
 
     triggerVis( sceneCloud );
 
