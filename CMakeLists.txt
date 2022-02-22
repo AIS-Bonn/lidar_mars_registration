@@ -5,14 +5,27 @@ project(lidar_mars_registration)
 ###   VARIABLES   ##############################################################
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(CMAKE_CXX_STANDARD 17) #needed also by the pybind so it can build itself in c++14 mode so we can use py:overload_cast
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -pthread -Werror=return-type -Wno-reorder -O2 -march=native -fopenmp ")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -pthread -Werror=return-type -Wno-reorder -O2 -march=native -fopenmp ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pthread -Werror=return-type -Wno-reorder -O3 -march=native -fopenmp ")
 
 option(USE_EASY_PBR "Compile with easy_pbr" OFF)
 
 ######   PACKAGES   ############################################################
+#deps
+if(NOT USE_EASY_PBR)
+  set( BUILD_SHARED_LIBS_TMP ${BUILD_SHARED_LIBS} )
+  set( BUILD_SHARED_LIBS OFF )
+endif()
+add_subdirectory(${PROJECT_SOURCE_DIR}/deps/abseil-cpp)
+add_subdirectory(${PROJECT_SOURCE_DIR}/deps/Sophus)
+if(NOT USE_EASY_PBR)
+  set( BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_TMP} )
+endif()
+
 find_package(catkin REQUIRED COMPONENTS
    rosbag_storage
    nav_msgs
@@ -29,10 +42,6 @@ find_package(Boost REQUIRED COMPONENTS filesystem )
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenCV REQUIRED)
 find_package(TBB REQUIRED)
-
-#deps
-add_subdirectory(${PROJECT_SOURCE_DIR}/deps/abseil-cpp)
-add_subdirectory(${PROJECT_SOURCE_DIR}/deps/Sophus)
 
 unset(PYTHONINTERP_FOUND CACHE)
 unset(PYTHON_EXECUTABLE CACHE)
