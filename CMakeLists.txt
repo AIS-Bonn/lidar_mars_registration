@@ -148,6 +148,6 @@ if(USE_EASY_PBR)
   target_link_libraries(run_${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_PROJECT_NAME}_libs )
 target_compile_definitions(run_${CMAKE_PROJECT_NAME} PRIVATE PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}") #point to the cmakelist folder of the easy_pbr
 endif()
-add_executable( ${CMAKE_PROJECT_NAME}_node ${PROJECT_SOURCE_DIR}/src/MarsRegistration_Node.cxx  )
+add_executable( ${CMAKE_PROJECT_NAME}_node ${PROJECT_SOURCE_DIR}/src/MarsRosNode.cxx  )
 target_link_libraries(${CMAKE_PROJECT_NAME}_node PRIVATE ${CMAKE_PROJECT_NAME}_libs )
 target_compile_definitions(${CMAKE_PROJECT_NAME}_node PRIVATE PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}") #point to the cmakelist folder of the easy_pbr

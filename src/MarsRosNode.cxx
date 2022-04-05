@@ -55,10 +55,6 @@ int main(int argc, char **argv)
     pnh.param<std::string>("config_file_rel", config_file_rel, "./config/live.cfg");
 
     std::string config_file = fs::canonical(fs::path(PROJECT_SOURCE_DIR) / config_file_rel).string();
-    //std::string config_file = fs::canonical(fs::path(PROJECT_SOURCE_DIR) / "./config/oxford.cfg").string();
-    //std::string config_file = fs::canonical(fs::path(PROJECT_SOURCE_DIR) / "./config/urban_loco.cfg").string();
-    //std::string config_file = fs::canonical(fs::path(PROJECT_SOURCE_DIR) / "./config/live.cfg").string();
-    //std::string config_file = fs::canonical(fs::path(PROJECT_SOURCE_DIR) / "./config/bag.cfg").string();
     LOG(INFO) << "config file: " << config_file;
 
     MarsSplineRegistrationAdaptor::Ptr mars_spline_registration_adaptor = MarsSplineRegistrationAdaptor::create(config_file);
