@@ -63,7 +63,7 @@ MarsMapBase<T>::MarsMapBase ( const MapParameters & params, const bool & allocat
     : m_map_params ( params ), m_storage ( params )
 {
     m_id = UID::get();
-//    LOG(INFO) << "creating map["<<m_id<<"]. lvls: " << m_map_params.m_num_levels << " " << m_storage.m_maps.size()  <<" mapSideLength: " << m_map_params.m_size << " cls: " << m_map_params.m_num_cells
+//    LOG(1) << "creating map["<<m_id<<"]. lvls: " << m_map_params.m_num_levels << " " << m_storage.m_maps.size()  <<" mapSideLength: " << m_map_params.m_size << " cls: " << m_map_params.m_num_cells
 //              << " min=[" << m_map_params.m_min_origin_bounds.transpose() << "] to max=[" << m_map_params.m_max_origin_bounds.transpose() << "]";
     if ( allocate )
         m_storage.allocate();
@@ -79,19 +79,19 @@ void MarsMapBase<T>::update( const bool & use_adaptive )
         if ( use_adaptive && m_map_params.m_omit_center ) // adaptive does not make sense without omit center.
         {
             MarsMapBase<T>::getCellsAdaptive(m_surfels, pose_w);
-            //LOG(INFO) << "Map. updating adaptive: " << m_surfels.size();
+            //LOG(1) << "Map. updating adaptive: " << m_surfels.size();
             adaptive_update = true;
         }
         else
         {
             MarsMapBase<T>::getCells(m_surfels, pose_w, m_map_params.m_omit_center);
-            //LOG(INFO) << "Map. updating normal: " << m_surfels.size();
+            //LOG(1) << "Map. updating normal: " << m_surfels.size();
         }
     }
     m_num_points = m_storage.update(m_surfels);
     m_adaptor_updated = true;
 
-    LOG(INFO) << "Map. updated: "<< m_num_points << " adaptive: " << adaptive_update << " surfels: " << m_surfels.size();
+    LOG(1) << "Map. updated: "<< m_num_points << " adaptive: " << adaptive_update << " surfels: " << m_surfels.size();
 }
 
 template <typename T>
@@ -162,7 +162,7 @@ void MarsMapBase<T>::removeCloudByScanId ( const IndexType & scan_id )
     m_storage.removeCloudByScanId( scan_id, cellsWithRemovedPoints, pointsRemoved, cellsRemoved );
     m_num_points -= pointsRemoved;
     if ( cellsRemoved > 0 ) m_adaptor_updated = false;
-    LOG(INFO) << "removed cloud with id: " << scan_id << " removed some: " <<cellsWithRemovedPoints;
+    LOG(1) << "removed cloud with id: " << scan_id << " removed some: " <<cellsWithRemovedPoints;
 }
 
 template <typename T>
@@ -173,7 +173,7 @@ void MarsMapBase<T>::getCellsAdaptive ( SurfelInfoVector & surfels, Sophus::SE3d
     surfels.reserve(1e4);
     m_storage.getCellsAdaptive( surfels, normal_level_cnter, coarser_level_cnter );
     pose_w = m_pose_w;
-    LOG(INFO) << "used from coarser level: " << coarser_level_cnter << " used from normal level: " << normal_level_cnter;
+    LOG(1) << "used from coarser level: " << coarser_level_cnter << " used from normal level: " << normal_level_cnter;
 }
 
 template <typename T>
@@ -236,7 +236,7 @@ void MarsMapBase<T>::getCells ( SurfelInfoConstPtrVector & surfels, Sophus::SE3d
         surfels.emplace_back(&surfel);
         //num_classes += surfel.m_class != nullptr;
     }
-    //LOG(INFO) << "getCells: num_clases " << num_classes << " of " << m_surfels.size();
+    //LOG(1) << "getCells: num_clases " << num_classes << " of " << m_surfels.size();
 }
 
 template <typename T>
@@ -253,7 +253,7 @@ void MarsMapBase<T>::getCellsAdaptive ( SurfelInfoConstPtrVector & surfels, Soph
         surfels.emplace_back(&surfel);
         //num_classes += surfel.m_class != nullptr;
     }
-    //LOG(INFO) << "getCells: num_clases " << num_classes;
+    //LOG(1) << "getCells: num_clases " << num_classes;
 }
 
 template <typename T>
@@ -262,7 +262,7 @@ void MarsMapBase<T>::addCells ( const SurfelInfoVector & surfels, const Sophus::
     m_adaptor_updated = false;
     const Sophus::SE3d pose_s1s2 = m_pose_w.inverse() * pose_w2;
 
-    LOG(INFO) << "pose_w: " << m_pose_w.params().transpose() << " pose_w2: " << pose_w2.params().transpose() << " pose_s1s2: " << pose_s1s2.params().transpose();
+    LOG(1) << "pose_w: " << m_pose_w.params().transpose() << " pose_w2: " << pose_w2.params().transpose() << " pose_s1s2: " << pose_s1s2.params().transpose();
     m_num_points += m_storage.addCells( surfels, pose_s1s2, level_modifier );
     if ( shouldUpdate )
     {
@@ -276,7 +276,7 @@ void MarsMapBase<T>::addCells ( const SurfelInfoConstPtrVector & surfels, const 
     m_adaptor_updated = false;
     const Sophus::SE3d pose_s1s2 = m_pose_w.inverse() * pose_w2;
 
-    LOG(INFO) << "pose_w: " << m_pose_w.params().transpose() << " pose_w2: " << pose_w2.params().transpose() << " pose_s1s2: " << pose_s1s2.params().transpose();
+    LOG(1) << "pose_w: " << m_pose_w.params().transpose() << " pose_w2: " << pose_w2.params().transpose() << " pose_s1s2: " << pose_s1s2.params().transpose();
     m_num_points += m_storage.addCells( surfels, pose_s1s2, level_modifier );
     if ( shouldUpdate )
     {
@@ -291,7 +291,7 @@ void MarsMapBase<T>::addCellsOnGrid ( const SurfelInfoVector & surfels, const Ei
     m_adaptor_updated = false;
     const Eigen::Vector3d t_s1s2 = -m_pose_w.translation() + t_w2;
 
-    LOG(INFO) << "pose_w: " << m_pose_w.params().transpose() << " t_w2: " << t_w2.transpose() << " t_s1s2: " << t_s1s2.transpose();
+    LOG(1) << "pose_w: " << m_pose_w.params().transpose() << " t_w2: " << t_w2.transpose() << " t_s1s2: " << t_s1s2.transpose();
     m_num_points += m_storage.addCellsOnGrid( surfels, t_s1s2, level_modifier );
     if ( shouldUpdate )
     {
@@ -306,7 +306,7 @@ void MarsMapBase<T>::addCellsOnGrid ( const SurfelInfoConstPtrVector & surfels, 
     m_adaptor_updated = false;
     const Eigen::Vector3d t_s1s2 = -m_pose_w.translation() + t_w2;
 
-    LOG(INFO) << "pose_w: " << m_pose_w.params().transpose() << " t_w2: " << t_w2.transpose() << " t_s1s2: " << t_s1s2.transpose();
+    LOG(1) << "pose_w: " << m_pose_w.params().transpose() << " t_w2: " << t_w2.transpose() << " t_s1s2: " << t_s1s2.transpose();
     m_num_points += m_storage.addCellsOnGrid( surfels, t_s1s2, level_modifier );
     if ( shouldUpdate )
     {
@@ -350,18 +350,18 @@ template <typename T>
 void MarsMapBase<T>::updateCells ( )
 {
     m_storage.updateCells();
-    LOG(INFO) << "updated cells.";
+    LOG(1) << "updated cells.";
 }
 
 template <typename T>
 bool MarsMapBase<T>::getSensorCell ( const Eigen::Vector3f & pt_s, const MarsMapBase<T>::LevelIndexType & search_lvl, SurfelInfoConstPtrVector & cellPtrs, const IndexType & neighbors) const
 {
     cellPtrs.clear();
-    //LOG(INFO) << "search_level: " << search_lvl << " pt: " << pt_w.transpose();
-    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_storage.m_maps.size()) ) { /*LOG(INFO) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; */ return false; } // check lvl bounds
-    //LOG(INFO) << "pt_s: " << pt_s.transpose();
-    if ( ! m_map_params.isInBounds<float> ( pt_s , search_lvl ) ) { /* LOG(INFO) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; */ return false; }
-    //LOG(INFO) << "inside.";
+    //LOG(1) << "search_level: " << search_lvl << " pt: " << pt_w.transpose();
+    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_storage.m_maps.size()) ) { /*LOG(1) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; */ return false; } // check lvl bounds
+    //LOG(1) << "pt_s: " << pt_s.transpose();
+    if ( ! m_map_params.isInBounds<float> ( pt_s , search_lvl ) ) { /* LOG(1) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; */ return false; }
+    //LOG(1) << "inside.";
     cellPtrs.reserve(27);
 
     return m_storage.getSensorCell(pt_s, search_lvl, cellPtrs, neighbors);

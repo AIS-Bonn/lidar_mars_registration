@@ -223,6 +223,7 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
         m_baselink_frame = (std::string)dyn_config["baselink_frame"];
         m_sensor_frame = (std::string)dyn_config["sensor_frame"];
         m_world_frame = (std::string)dyn_config["world_frame"];
+        m_send_map_baselink_tf = dyn_config["send_map_baselink_tf"];
         m_tf_buffer = std::make_shared<tf2_ros::Buffer>();
         m_tf_listener = std::make_shared<tf2_ros::TransformListener>( *m_tf_buffer );
         m_tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>();
@@ -254,7 +255,7 @@ void MarsSplineRegistrationAdaptor::imu_msgs_ros ( const sensor_msgs::Imu::Const
     if ( ! m_imu_msgs )
         m_imu_msgs = std::make_shared<ImuMsgs>();
     (*m_imu_msgs)[imu_msg->header.stamp.toNSec()]=*imu_msg;
-//    LOG(INFO) << "imu msgs: " <<m_imu_msgs->size();
+//    LOG(1) << "imu msgs: " <<m_imu_msgs->size();
 }
 void MarsSplineRegistrationAdaptor::gps_msgs_ros ( const nav_msgs::Odometry::ConstPtr& gps_msg)
 {
@@ -264,7 +265,7 @@ void MarsSplineRegistrationAdaptor::gps_msgs_ros ( const nav_msgs::Odometry::Con
         m_gps_msgs = std::make_shared<GpsMsgs>();
     //m_gps_msgs->push_back(*gps_msg);
     (*m_gps_msgs)[gps_msg->header.stamp.toNSec()]=*gps_msg;
-//    LOG(INFO) << "gps msgs: " <<m_gps_msgs->size();
+//    LOG(1) << "gps msgs: " <<m_gps_msgs->size();
 }
 
 template <typename Msg, typename MsgsPtr>
@@ -277,13 +278,13 @@ MsgsPtr getCurrentMsgs( const MsgsPtr & m_msgs, std::mutex & msgMutex, const int
         {
             const auto it_beg = m_msgs->lower_bound(last_cloud_stamp);
             const auto it_end = m_msgs->upper_bound(current_cloud_stamp);
-            //LOG(INFO) << "grabbing msgs: " << std::distance(it_beg, it_end)<< " end? " << (it_beg == m_msgs->end()) << " " << (it_end == m_msgs->end()) << " s: " << m_msgs->size();
+            //LOG(1) << "grabbing msgs: " << std::distance(it_beg, it_end)<< " end? " << (it_beg == m_msgs->end()) << " " << (it_end == m_msgs->end()) << " s: " << m_msgs->size();
             if ( it_beg != m_msgs->end() )
             {
                 msgs->insert(it_beg,it_end);
-                //LOG(INFO) << "inserted mgs: " << msgs->size() << " db: " << std::distance(m_msgs->begin(),it_beg) << " db: " << std::distance(it_beg,m_msgs->end());
+                //LOG(1) << "inserted mgs: " << msgs->size() << " db: " << std::distance(m_msgs->begin(),it_beg) << " db: " << std::distance(it_beg,m_msgs->end());
                 m_msgs->erase(m_msgs->begin(),it_beg);
-                //LOG(INFO) << "new msgs size: " << m_msgs->size();
+                //LOG(1) << "new msgs size: " << m_msgs->size();
             }
         }
     }
@@ -302,7 +303,7 @@ void MarsSplineRegistrationAdaptor::cloud_msgs_ros ( const sensor_msgs::PointClo
 
     const int64_t dt = TimeConversion::to_ns(1./(m_num_scans_per_second));
     const int64_t last_cloud_stamp_dt = last_cloud_stamp + 1.05*dt;
-    //LOG(INFO) << "lcs: " << last_cloud_stamp << " dt: " << dt << " lcs+dt: " << last_cloud_stamp_dt;
+    //LOG(1) << "lcs: " << last_cloud_stamp << " dt: " << dt << " lcs+dt: " << last_cloud_stamp_dt;
     if ( last_cloud_stamp_dt < current_cloud_stamp ) // for orientation compensation of os_lidars
     {
        last_cloud_stamp = current_cloud_stamp - dt;
@@ -387,7 +388,7 @@ void MarsSplineRegistrationAdaptor::convertToMapCloud( const std::shared_ptr<Inp
         //if ( scan_line_id < min_scan_line_id ) min_scan_line_id = scan_line_id;
         //if ( scan_column > max_scan_column ) max_scan_column = scan_column;
         //if ( scan_column < min_scan_column ) min_scan_column = scan_column;
-        //if ( ! m_organized_scans && i == inputCloud->V.rows()-1 ) LOG(INFO) << "pt: " << inputCloud->V.row(i) << " row: "  << scan_line_id << " ( " << min_scan_line_id << " - " << max_scan_line_id << ")" << " col: "<< scan_column << " ( " << min_scan_column << " - " << max_scan_column << ")" ;
+        //if ( ! m_organized_scans && i == inputCloud->V.rows()-1 ) LOG(1) << "pt: " << inputCloud->V.row(i) << " row: "  << scan_line_id << " ( " << min_scan_line_id << " - " << max_scan_line_id << ")" << " col: "<< scan_column << " ( " << min_scan_column << " - " << max_scan_column << ")" ;
 
         if ( scan_line_id >= m_max_scan_line ) continue;
         if ( range < m_min_range ) continue;
@@ -441,7 +442,7 @@ void MarsSplineRegistrationAdaptor::showPoses ( const Sophus::SE3d & cur_pose, c
         gm->addPoint( cur_pose.translation().cast<float>(), VisMesh::red);
         gm->showAggregatedPointMesh(Sophus::SE3d(),"gps_pose");
     }
-    LOG(INFO) << "GPS: " << cur_pose.params().transpose();
+    LOG(1) << "GPS: " << cur_pose.params().transpose();
 #endif
 
     //static std::ofstream regPosesFile ("./reg_poses.txt");
@@ -600,7 +601,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
         if ( m_use_tf_for_baselink_sensor )
             transform_baselink_sensor = m_tf_buffer->lookupTransform( m_baselink_frame, m_sensor_frame, ros::Time(0) );
     }
-    catch (tf2::TransformException ex){
+    catch (const tf2::TransformException & ex){
         ROS_ERROR_STREAM_THROTTLE(1,ex.what());
         return;
     }
@@ -631,7 +632,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     }
     }
 
-    LOG(INFO) << "sceneCloud: " << sceneCloud->size() << " id:" << m_scan_id << " gps: " << (gps_msgs==nullptr?0:gps_msgs->size()) << " imu: " <<(imu_msgs==nullptr?0:imu_msgs->size());
+    LOG(1) << "sceneCloud: " << sceneCloud->size() << " id:" << m_scan_id << " gps: " << (gps_msgs==nullptr?0:gps_msgs->size()) << " imu: " <<(imu_msgs==nullptr?0:imu_msgs->size());
 
     Sophus::SE3d cur_gps_world_base;
     bool gps_valid = false;
@@ -669,7 +670,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
             m_pose_field_map_init.translation().setZero();
             m_gps_world_base_init.translation().setZero();
         }
-        LOG(INFO) << "initialized Field to Map: " << m_pose_field_map_init.params().transpose();
+        LOG(1) << "initialized Field to Map: " << m_pose_field_map_init.params().transpose();
     }
 
     const Sophus::SE3d firstPose_lidar_imu = (m_cur_pose_baselink_sensor*m_gps_world_base_init.inverse());
@@ -702,6 +703,14 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
             interp_pose_map_baselink;
     // TODO: add interpolation offset on the time stamp
     publishOdom ( m_odom_publisher, sceneCloud->m_stamp, m_map_frame, m_corrected_baselink_frame, interp_pose_firstMap_baselink, velocity_baselink, cov );
+
+    if ( m_send_map_baselink_tf )
+    {
+        const geometry_msgs::Transform map_baselink = sophusToTransform( interp_pose_firstMap_baselink );
+        const geometry_msgs::TransformStamped stampedTransformMapBaselink =
+        toTransformStamped( map_baselink, input_stamp+validityTimeOffset, m_map_frame, m_corrected_baselink_frame );
+        m_tf_broadcaster->sendTransform(stampedTransformMapBaselink);
+    }
 
     {
         static std::ofstream regPosesFile ("./lidar_mars_registration_after_map_poses.txt");
@@ -764,7 +773,7 @@ void MarsSplineRegistrationAdaptor::register_cloud ( CloudPtr mesh, const ImuMsg
             if ( gps_msg.pose.covariance[0] < m_gps_invalid_threshold || invalid_pos )
             {
                 first_gps_world_base.translation().setZero();
-                LOG(INFO) << "reset first pose.";
+                LOG(1) << "reset first pose.";
             }
         }
 
@@ -782,7 +791,7 @@ void MarsSplineRegistrationAdaptor::register_cloud ( CloudPtr mesh, const ImuMsg
     MarsMapPointCloud::Ptr sceneCloud = MarsMapPointCloud::create();
     convertToMapCloud<Cloud,MarsMapPointCloud>(mesh, sceneCloud, m_scan_id);
 
-    LOG(INFO) << "sceneCloud: " << sceneCloud->size() << " id:" << m_scan_id << " gps: " << (gps_msgs==nullptr?0:gps_msgs->size()) << " imu: " <<(imu_msgs==nullptr?0:imu_msgs->size());
+    LOG(1) << "sceneCloud: " << sceneCloud->size() << " id:" << m_scan_id << " gps: " << (gps_msgs==nullptr?0:gps_msgs->size()) << " imu: " <<(imu_msgs==nullptr?0:imu_msgs->size());
 
 #ifdef USE_EASY_PBR
     sceneCloud->transform_points(cur_pose_world_sensor.inverse()); // center cloud at Identity
@@ -1009,7 +1018,7 @@ void MarsSplineRegistrationAdaptor::runVisMap ( )
         {
             ZoneScopedN("MarsSplineRegistrationAdaptor::Visualization");
             const int64_t now = sceneCloud->m_stamp;
-            //LOG(INFO) << "now: " << now << " map_sub: " << m_map_publisher->getNumSubscribers() << " topic: " << m_map_publisher->getTopic() ;
+            //LOG(1) << "now: " << now << " map_sub: " << m_map_publisher->getNumSubscribers() << " topic: " << m_map_publisher->getTopic() ;
             if ( m_map_publisher->getNumSubscribers() > 0 )
             {
                 constexpr int64_t time_between_map_publish_ns = 1e9; // 1 sec
@@ -1017,7 +1026,7 @@ void MarsSplineRegistrationAdaptor::runVisMap ( )
                 static sensor_msgs::PointCloud2Ptr msg = nullptr;
                 static int64_t prev_last_keyframe_stamp = m_marsRegistrator->getLastKeyFrameStamp();
                 const int64_t last_keyframe_stamp = m_marsRegistrator->getLastKeyFrameStamp();
-                //LOG(INFO) << "ts: " << prev_last_keyframe_stamp << " " << last_keyframe_stamp << " " << (msg==nullptr);
+                //LOG(1) << "ts: " << prev_last_keyframe_stamp << " " << last_keyframe_stamp << " " << (msg==nullptr);
                 if ( last_keyframe_stamp != prev_last_keyframe_stamp || msg == nullptr )
                 {
                     MarsMapPointCloud::Ptr local_map_centers = m_marsRegistrator->getLocalMapSurfelCenters();

@@ -533,6 +533,41 @@ class Se3Spline {
     return res;
   }
 
+  /// @brief Evaluate acceleration residual and Jacobians.
+  ///
+  /// @param[in] time_ns time of the measurement
+  /// @param[in] measurement acceleration measurement
+  /// @param[out] J_knots Jacobian with respect to spline knots
+  /// @return acceleration residual
+  Vec3 transAccelWorldResidual(int64_t time_ns, const Vec3 &measurement,
+                               PosJacobianStruct *Jp = nullptr) const {
+    Eigen::Vector3d accel_world = pos_spline.acceleration(time_ns, Jp);
+    Vec3 res = accel_world - measurement;
+    return res;
+  }
+
+  /// @brief Evaluate rotational acceleration (second time derivative) of SO(3)
+  /// B-spline in the body frame
+  ///
+  /// @param[in] time_ns time for evaluating acceleration of the spline in
+  /// nanoseconds
+  /// @param[out] J_accel if not nullptr, return the Jacobian of the rotational
+  /// acceleration in body frame with respect to knots
+  /// @param[out] vel_body if not nullptr, return the rotational velocity in the
+  /// body frame (3x1 vector) (side computation)
+  /// @param[out] J_vel if not nullptr, return the Jacobian of the rotational
+  /// velocity in the body frame (side computation)
+  /// @return rotational acceleration (3x1 vector)
+  Vec3 rotAccelBodyResidual(int64_t time_ns, const Vec3 &measurement,
+                            SO3JacobianStruct* J_accel = nullptr) const {
+
+      Eigen::Vector3d rot_acc = J_accel != nullptr ?
+                  so3_spline.accelerationBody(time_ns, J_accel)
+                : so3_spline.accelerationBody(time_ns);
+      Vec3 res = rot_acc - measurement;
+      return res;
+  }
+
   /// @brief Evaluate position residual.
   ///
   /// @param[in] time_ns time of the measurement

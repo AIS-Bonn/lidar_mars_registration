@@ -503,8 +503,8 @@ CloudPtr VisMesh::getCubeMesh( const float & cube_size ) const
             }
         }
     }
-    //LOG(INFO) << "F:\n" << mesh->F;
-    LOG(INFO) << "occAll: F: " << mesh->F.rows() << " " << mesh->F.maxCoeff() << " V: " << mesh->V.rows() << " v: " << vertices.size();
+    //LOG(1) << "F:\n" << mesh->F;
+    LOG(1) << "occAll: F: " << mesh->F.rows() << " " << mesh->F.maxCoeff() << " V: " << mesh->V.rows() << " v: " << vertices.size();
 
 //    mesh->V = vec2eigen(vertices);
 //    mesh->C = vec2eigen(colors);
@@ -831,10 +831,10 @@ void VisMesh::resetForAggregation()
 void VisMesh::showAggregatedPointMesh ( const Sophus::SE3d & oldLastScenePose, const std::string & meshName, const float & randomSampleFactor, const bool & show )
 {
     CloudPtr new_mesh = getPointMesh();
-    //LOG(INFO) << "NewMesh: " << new_mesh->V.rows() << " rsf: " << randomSampleFactor;
+    //LOG(1) << "NewMesh: " << new_mesh->V.rows() << " rsf: " << randomSampleFactor;
     if ( randomSampleFactor > 0. && randomSampleFactor < 1. )
         new_mesh->random_subsample(randomSampleFactor);
-    //LOG(INFO) << "NewMesh after RSS: " << new_mesh->V.rows() << " rsf: " << randomSampleFactor;
+    //LOG(1) << "NewMesh after RSS: " << new_mesh->V.rows() << " rsf: " << randomSampleFactor;
     if ( ! oldLastScenePose.params().isApprox(Sophus::SE3d().params()) )
         new_mesh->transform_vertices_cpu(Eigen::Affine3d(oldLastScenePose.matrix()));
     new_mesh->worldROS2worldGL();

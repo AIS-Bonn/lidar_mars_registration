@@ -85,7 +85,7 @@ MarsMapWindow::MarsMapWindow ( const size_t & cur_queue_size, const bool & map_p
             asOneMap = MarsMapType::create( MapParameters::getMapParameters( map_side_length, num_cells, num_levels, use_adaptive, false ) ); // sets omit_center to false! which is important to have all surfels available
             asOneTmpMap = MarsMapType::create( asOneMap->m_map_params );
     }
-    LOG(INFO) << "MarsMapWindow: numMaps: "<< oldMaps.size();
+    LOG(1) << "MarsMapWindow: numMaps: "<< oldMaps.size();
 }
 
 MarsMapWindow::Ptr MarsMapWindow::create( const size_t & cur_queue_size, const bool & store_map_per_cloud, const bool & use_adaptive )
@@ -113,7 +113,7 @@ std::vector<MarsMapType*> MarsMapWindow::getTransformedMapPtrVec( const Sophus::
         if ( ! *mapsIt ) LOG(FATAL) << "why is there an empty cloud ptr?";
         (*adapIt) = mapsIt->get();
         (*adapIt)->setPose( pose );
-        //LOG(INFO) << "Map has: " << (*adapIt)->m_id << " Map has: " << (*mapsIt)->m_id;
+        //LOG(1) << "Map has: " << (*adapIt)->m_id << " Map has: " << (*mapsIt)->m_id;
     }
     return m;
 }
@@ -190,7 +190,7 @@ Eigen::VectorXt MarsMapWindow::getTimesSince ( const uint64_t & last_ts ) const
     Eigen::VectorXt timesSinceLast = Eigen::VectorXt::Zero(times.size(),1);
     for ( size_t i = 0; i < times.size(); ++i )
         timesSinceLast[i] = (times[i] - last_ts);
-    //LOG(INFO) << "getTimesSinceLast: last: " << last_ts << " tsl: " << timesSinceLast.transpose();
+    //LOG(1) << "getTimesSinceLast: last: " << last_ts << " tsl: " << timesSinceLast.transpose();
     return timesSinceLast;
 }
 
@@ -261,7 +261,7 @@ bool MarsMapWindow::moveWindowToNext()
     const int iters = store_map_per_cloud ? 1 : asOneMap->m_map_params.m_num_levels;
     for ( int i  = 0; i < iters; ++i )
     {
-        //LOG(INFO) << "maps.size():" << maps.size() << " oldMaps.size(): " << oldMaps.size() << " param: " << maps.front()->m_map_params.m_num_cells << " " << maps.front()->m_map_params.m_size;
+        //LOG(1) << "maps.size():" << maps.size() << " oldMaps.size(): " << oldMaps.size() << " param: " << maps.front()->m_map_params.m_num_cells << " " << maps.front()->m_map_params.m_size;
         oldMaps.emplace_front(maps.front());
         maps.pop_front();
     }
@@ -296,7 +296,7 @@ Sophus::SE3d MarsMapWindow::getClosestKeyFramePose( const Sophus::SE3d & scene_p
 void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE3d & map_pose )
 {
     if ( !newCloud ) LOG(FATAL) << "empty cloud.";
-    //LOG(INFO) << "cloud size: " << clouds.size() << " " << maps.size() << " qs: " << queue_size;
+    //LOG(1) << "cloud size: " << clouds.size() << " " << maps.size() << " qs: " << queue_size;
     if ( store_map_per_cloud && maps.size() != clouds.size() ) LOG(FATAL) << " sizes are inconsistent.";
 
     local_map_moved = false;
@@ -305,13 +305,13 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
     m_out_of_window_cloud_pose = Sophus::SE3d();
     if ( hasFullWindow() || ( !maps.empty() && ! store_map_per_cloud ) )
     {
-        //LOG(INFO) << "Moving Local Map.";
+        //LOG(1) << "Moving Local Map.";
         const bool thereIsSomethingToForget = moveWindowToNext();
         if ( with_forgetting && thereIsSomethingToForget )
         {
             if ( ! store_map_per_cloud && m_out_of_window_cloud )
             {
-                //LOG(INFO) << "finding the right ones to forget.";
+                //LOG(1) << "finding the right ones to forget.";
                 ZoneScopedN("MarsMapWindow::remove_old_cloud");
                 absl::flat_hash_set<MarsMapType::IndexType> scan_ids;
                 if ( m_out_of_window_cloud->single_scan() )
@@ -330,7 +330,7 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                 }
             }
         }
-        //LOG(INFO) << "Moved and removed from Local Map.";
+        //LOG(1) << "Moved and removed from Local Map.";
     }
     clouds.emplace_back(newCloud);
     clouds_pose.emplace_back(map_pose);
@@ -366,11 +366,11 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                 num_invalid += !cell->m_surfel->valid_;
                 num_less_pts += (cell->m_surfel->getNumPoints() < 10.0);
     //            if ( cell->m_surfel->getNumPoints() < 10.0 )
-    //                LOG(INFO) <<"MarsMapWindow:: Cell: lvl: " << cell->m_level << " idx: " << Eigen::Map<const Eigen::Vector3i>(cell->m_index.data()).transpose() << " center: " << cell->m_center_s.transpose() << " pts: "<<  cell->m_surfel->getNumPoints();
+    //                LOG(1) <<"MarsMapWindow:: Cell: lvl: " << cell->m_level << " idx: " << Eigen::Map<const Eigen::Vector3i>(cell->m_index.data()).transpose() << " center: " << cell->m_center_s.transpose() << " pts: "<<  cell->m_surfel->getNumPoints();
                 if ( !cell->m_surfel->valid_ || cell->m_surfel->getNumPoints() < 10.0 ) continue;
                 ++num_valid;
             }
-            LOG(INFO) << "MarsMapWindow:: Map-Cells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
+            LOG(1) << "MarsMapWindow:: Map-Cells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
             maps.back()->update(true);
             maps.back()->getCells( cells, pose );
             num_invalid = 0, num_less_pts = 0, num_valid = 0;
@@ -381,11 +381,11 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                 num_invalid += !cell->m_surfel->valid_;
                 num_less_pts += (cell->m_surfel->getNumPoints() < 10.0);
     //            if ( cell->m_surfel->getNumPoints() < 10.0 )
-    //                LOG(INFO) <<"MarsMapWindow:: Cell: lvl: " << cell->m_level << " idx: " << Eigen::Map<const Eigen::Vector3i>(cell->m_index.data()).transpose() << " center: " << cell->m_center_s.transpose() << " pts: "<<  cell->m_surfel->getNumPoints();
+    //                LOG(1) <<"MarsMapWindow:: Cell: lvl: " << cell->m_level << " idx: " << Eigen::Map<const Eigen::Vector3i>(cell->m_index.data()).transpose() << " center: " << cell->m_center_s.transpose() << " pts: "<<  cell->m_surfel->getNumPoints();
                 if ( !cell->m_surfel->valid_ || cell->m_surfel->getNumPoints() < 10.0 ) continue;
                 ++num_valid;
             }
-            LOG(INFO) << "MarsMapWindow:: Map-Cells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
+            LOG(1) << "MarsMapWindow:: Map-Cells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
         }
 #endif
     }
@@ -395,12 +395,12 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
         std::vector<MarsMapTypePtr> mapPtr;
         for ( int lvl = 0; lvl < asOneMap->m_map_params.m_num_levels; ++lvl )
         {
-            //LOG(INFO) << "maps.size():" << maps.size() << " oldMaps.size(): " << oldMaps.size() << " lvl " << lvl << " param: " << oldMaps.back()->m_map_params.m_num_cells << " " << oldMaps.back()->m_map_params.m_size;
+            //LOG(1) << "maps.size():" << maps.size() << " oldMaps.size(): " << oldMaps.size() << " lvl " << lvl << " param: " << oldMaps.back()->m_map_params.m_num_cells << " " << oldMaps.back()->m_map_params.m_size;
             maps.emplace_back(oldMaps.back());
             mapPtr.emplace_back(maps.back());
             oldMaps.pop_back();
         }
-        //LOG(INFO) << "maps.size():" << maps.size() << " oldMaps.size(): " << oldMaps.size();
+        //LOG(1) << "maps.size():" << maps.size() << " oldMaps.size(): " << oldMaps.size();
 
         constexpr bool id_map_orientation = true;
         bool shouldMoveMap = false;
@@ -446,7 +446,7 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                         ZoneScopedN("MarsMapWindow::AddCellsOneCloud::set_cloud_lvl");
                         mapPtr[lvl]->setCloud( newCloudMap, new_map_pose, map_integration_pose.inverse().translation() );
                     }
-                    LOG(INFO) << "lvl=["<<lvl<<"] nc: " << numCells.col(lvl).transpose() << " mapPose: " <<  map_pose.params().transpose() << " newMapPose: " << new_map_pose.params().transpose() << " mapIntPose: " << map_integration_pose.params().transpose();
+                    LOG(1) << "lvl=["<<lvl<<"] nc: " << numCells.col(lvl).transpose() << " mapPose: " <<  map_pose.params().transpose() << " newMapPose: " << new_map_pose.params().transpose() << " mapIntPose: " << map_integration_pose.params().transpose();
                 }
 #ifdef USE_TBB
             });
@@ -454,7 +454,7 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                 minNumCells = numCells.rowwise().minCoeff();
             }
             shouldMoveMap = (minNumCells>=m_min_num_cells_for_moving_map).any() && minNumCells[0] != std::numeric_limits<int>::max();
-            LOG(INFO) << "minNumCells: " << minNumCells.transpose() <<  " th: " << m_min_num_cells_for_moving_map << " shouldMove: " << shouldMoveMap;
+            LOG(1) << "minNumCells: " << minNumCells.transpose() <<  " th: " << m_min_num_cells_for_moving_map << " shouldMove: " << shouldMoveMap;
         }
         if ( shouldMoveMap )
         {
@@ -484,12 +484,12 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                     asOneMap->transform(max_translation_lvl_pose_inv);
                 }
 
-                LOG(INFO) << "lm_last_moving_pose: " << local_map_last_moving_pose.params().transpose() << " lmp: " << local_map_pose.params().transpose()
+                LOG(1) << "lm_last_moving_pose: " << local_map_last_moving_pose.params().transpose() << " lmp: " << local_map_pose.params().transpose()
                           << " mtlpi: " << max_translation_lvl_pose_inv.params().transpose() << " aOM: " << asOneMap->m_pose_w.params().transpose();
                 for ( int mapIdx = 0; mapIdx < int(maps.size()); ++mapIdx )
-                    LOG(INFO) << " M"<<mapIdx <<": " <<  maps[mapIdx]->m_pose_w.params().transpose();
+                    LOG(1) << " M"<<mapIdx <<": " <<  maps[mapIdx]->m_pose_w.params().transpose();
                 for ( int mapIdx = 0; mapIdx < int(mapPtr.size()); ++mapIdx )
-                    LOG(INFO) << " M"<<mapIdx <<": " <<  mapPtr[mapIdx]->m_pose_w.params().transpose();
+                    LOG(1) << " M"<<mapIdx <<": " <<  mapPtr[mapIdx]->m_pose_w.params().transpose();
             }
             {
                 ZoneScopedN("MarsMapWindow::MovingAsOneMap::addOneMap");
@@ -521,7 +521,7 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                 if ( lvl < 2 ) continue;
                 //maps[mapIdx]->getCellsScanWise ( surfels, pose_w, false, lvl );
                 maps[mapIdx]->getCellsFused ( surfels, pose_w, false );
-                //LOG(INFO) << "Adding Cells: " << surfels.size() << " lvl :" << lvl << " id: " << maps[mapIdx]->m_id;
+                //LOG(1) << "Adding Cells: " << surfels.size() << " lvl :" << lvl << " id: " << maps[mapIdx]->m_id;
                 //asOneMap->addCells ( surfels, pose_w, false, lvl ); // will be updated when adding last of the current ones.
 
                 Eigen::Vector3f rc = VisMesh::getPlasma( float(mapIdx) / maps.size() );
@@ -537,7 +537,7 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
             }
         }
 #endif
-        LOG(INFO) << "showed status in between! #pts: " << asOneMap->m_num_points;
+        LOG(1) << "showed status in between! #pts: " << asOneMap->m_num_points;
 
         {
             ZoneScopedN("MarsMapWindow::AddedCells::AddSurfelToAsOneMap");
@@ -547,8 +547,8 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
             {
                 mapPtr[lvl]->getCellsScanWise ( surfels, pose_w, false );
 
-                LOG(INFO) << "Adding Cells: " << surfels.size() << " lvl :" << lvl << " param: " << mapPtr[lvl]->m_map_params.m_num_cells << " " << mapPtr[lvl]->m_map_params.m_size;
-                if ( shouldMoveMap ) LOG(INFO) << "pose_w: " << pose_w.params().transpose() << " oneMap: "<< asOneMap->m_pose_w.params().transpose();
+                LOG(1) << "Adding Cells: " << surfels.size() << " lvl :" << lvl << " param: " << mapPtr[lvl]->m_map_params.m_num_cells << " " << mapPtr[lvl]->m_map_params.m_size;
+                if ( shouldMoveMap ) LOG(1) << "pose_w: " << pose_w.params().transpose() << " oneMap: "<< asOneMap->m_pose_w.params().transpose();
 
                 if ( id_map_orientation )
                 {
@@ -568,7 +568,7 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
             }
         }
         asOneMap->update(m_use_adaptive);
-        LOG(INFO) << "showed status after adding! #pts: " << asOneMap->m_num_points;
+        LOG(1) << "showed status after adding! #pts: " << asOneMap->m_num_points;
 #ifdef USE_EASY_PBR
         {
             ZoneScopedN("MarsMapWindow::AddedCells::getCells");
@@ -585,7 +585,7 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                 if ( !cell->m_surfel->valid_ || cell->m_surfel->getNumPoints() < 10.0 ) continue;
                 ++num_valid;
             }
-            LOG(INFO) << "MarsMapWindow:: AsOneMap-Cells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
+            LOG(1) << "MarsMapWindow:: AsOneMap-Cells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
             num_invalid = 0, num_less_pts = 0, num_valid = 0;
             for ( int lvl = 0; lvl < asOneMap->m_map_params.m_num_levels; ++lvl )
             {
@@ -600,12 +600,12 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                     ++num_valid;
                 }
             }
-            LOG(INFO) << "oneMapPose: " <<  map_pose.params().transpose() << " asOneMapPose: " << asOneMap->getMapPose().params().transpose();
-            LOG(INFO) << "MarsMapWindow::LvlCells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
+            LOG(1) << "oneMapPose: " <<  map_pose.params().transpose() << " asOneMapPose: " << asOneMap->getMapPose().params().transpose();
+            LOG(1) << "MarsMapWindow::LvlCells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
         }
 #endif
     }
-    LOG(INFO) << "cloud size: " << clouds.size() << " " << maps.size() << " qs: " << queue_size;
+    LOG(1) << "cloud size: " << clouds.size() << " " << maps.size() << " qs: " << queue_size;
 }
 
 MarsMapTypePtr MarsMapWindow::getAsOneCenteredMap()

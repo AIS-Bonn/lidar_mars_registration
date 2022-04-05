@@ -157,6 +157,8 @@ private:
     std::string m_world_frame = "";
     std::string m_map_frame = "";
 
+    bool m_send_map_baselink_tf = false;
+
     bool m_compensate_orientation = false;
     bool m_organized_scans = true;
     double m_fov_up = 45;

@@ -113,9 +113,11 @@ inline int  setUpNormalEquations ( std::vector<MarsRegistrationDataPair> & param
             accumN += accumNL;
         }
     }
+#ifdef DO_NORMALIZE
     accumH /= accumW;
     accumB /= accumW;
     accumE /= accumW;
+#endif
     return accumN;
 }
 
@@ -149,4 +151,119 @@ inline void evalOnce ( std::vector<MarsRegistrationDataPair> & paramVec,
         newAccumE += newerAccumE;
         newAccumW += newerAccumW;
     }
+#ifdef DO_NORMALIZE
+    newAccumE /= newAccumW;
+#endif
+}
+
+// TODO: weight according to data constraints direction?
+template <typename SplineType, int M>
+inline
+bool setUpNormalEquationsSoftConstraints( const std::shared_ptr<SplineType> & spline,
+                                          const Eigen::Matrix<int64_t,M,1> & times,
+                                          const Eigen::Matrix<int,M,1> & used,
+                                          const double & sca_weight,
+                                          Eigen::Matrix<NormalEquationScalarType,SplineType::N*D,SplineType::N*D> & accumH,
+                                          Eigen::Matrix<NormalEquationScalarType,SplineType::N*D,1> & accumB,
+                                          NormalEquationScalarType & accumE,
+                                          NormalEquationScalarType & accumW )
+{
+    //LOG(FATAL) << "currently disabled ;-)";
+    //constexpr double const_vel_reg_weight = 0.001;
+    constexpr int min_num_constrained = 1;
+    constexpr int ND = SplineType::N * D;
+    using MatDK = Eigen::Matrix<NormalEquationScalarType,D,ND>;
+    using VecD = Eigen::Matrix<NormalEquationScalarType,D,1>; // pos, ori
+    using MatK = Eigen::Matrix<NormalEquationScalarType,ND,ND>;
+    using VecK = Eigen::Matrix<NormalEquationScalarType,ND,1>;
+    using AccelPosJac = typename SplineType::PosJacobianStruct;
+    using AccelRotJac = typename SplineType::SO3JacobianStruct;
+
+    MatK scaAccumH = MatK::Zero();
+    VecK scaAccumB = VecK::Zero();
+
+    bool any_valid = false;
+    NormalEquationScalarType scaAccumE = 0, scaAccumW = 0;
+    MatDK Dx = MatDK::Zero();
+    VecD diff = VecD::Zero();
+    AccelPosJac Ja;
+    AccelRotJac Jr;
+
+    for ( int idx = 0; idx < M; ++idx )
+    {
+        const int64_t t = times[idx];
+        if ( used[idx] >= min_num_constrained ) continue;
+
+        const Sophus::Vector3d diff_acc = spline->transAccelWorldResidual( t, Eigen::Vector3d::Zero(), &Ja );
+        const Sophus::Vector3d diff_rot = spline->rotAccelBodyResidual( t, Eigen::Vector3d::Zero(), &Jr );
+        diff.head<3>() = diff_acc.cast<NormalEquationScalarType>();
+        diff.tail<3>() = diff_rot.cast<NormalEquationScalarType>();
+
+        for (int i = 0; i < SplineType::N; ++i) {
+            Dx.template block<3,3>(0,D*i) = (Ja.d_val_d_knot[i] * Eigen::Matrix3d::Identity()).template cast<NormalEquationScalarType>(); // pos
+            Dx.template block<3,3>(3,D*i+3) = Jr.d_val_d_knot[i].template cast<NormalEquationScalarType>(); // rot
+        }
+
+        const double error = .5 * diff.dot(diff);
+        scaAccumH += (Dx.transpose() * sca_weight * Dx);
+        scaAccumB += (Dx.transpose() * sca_weight * diff);
+        scaAccumE += sca_weight * error;
+        scaAccumW += sca_weight;
+        any_valid = true;
+    }
+    if constexpr ( print_info )
+    LOG(INFO) << "SCA: ew: " << (scaAccumE/scaAccumW) << " w: " << scaAccumW << " e: " << scaAccumE << " av: " << any_valid;
+    if ( any_valid )
+    {
+#ifdef DO_NORMALIZE
+        accumH += (scaAccumH / scaAccumW).template triangularView<Eigen::Upper>();
+        accumB += scaAccumB / scaAccumW;
+        accumE += scaAccumE / scaAccumW;
+#else
+        accumH += (scaAccumH).template triangularView<Eigen::Upper>();
+        accumB += scaAccumB;
+        accumE += scaAccumE;
+#endif
+        accumW += scaAccumW;
+    }
+    return any_valid;
+}
+
+template <typename SplineType, int M>
+inline
+bool evalSoftConstraintsOnce ( const std::shared_ptr<SplineType> & new_spline,
+                               const Eigen::Matrix<int64_t,M,1> & times,
+                               const Eigen::Matrix<int,M,1> & used,
+                               const double & sca_weight,
+                               NormalEquationScalarType & newAccumE,
+                               NormalEquationScalarType & newAccumW )
+{
+    constexpr int min_num_constrained = 1;
+
+    bool any_valid = false;
+    NormalEquationScalarType scaAccumE = 0, scaAccumW = 0;
+    for ( int idx = 0; idx < M; ++idx )
+    {
+        const int64_t t = times[idx];
+        if ( used[idx] >= min_num_constrained ) continue;
+        const Sophus::Vector3d diff_acc = new_spline->transAccelWorldResidual( t, Eigen::Vector3d::Zero() );
+        const Sophus::Vector3d diff_rot = new_spline->rotAccelBodyResidual( t, Eigen::Vector3d::Zero() );
+        const double error_acc = .5 * diff_acc.dot(diff_acc);
+        const double error_rot = .5 * diff_rot.dot(diff_rot);
+        scaAccumE += sca_weight * (error_acc + error_rot);
+        scaAccumW += sca_weight;
+        any_valid = true;
+    }
+    if constexpr ( print_info )
+    LOG(INFO) << "SCAA: ew: " << (scaAccumE/scaAccumW) << " w: "<< scaAccumW << " e: " << scaAccumE;
+    if ( any_valid )
+    {
+#ifdef DO_NORMALIZE
+        newAccumE += scaAccumE / scaAccumW;
+#else
+        newAccumE += scaAccumE;
+#endif
+        newAccumW += scaAccumW;
+    }
+    return any_valid;
 }

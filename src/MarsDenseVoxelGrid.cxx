@@ -169,7 +169,7 @@ int DenseVoxelGrid::addCloud ( MarsMapPointCloud::Ptr cloud, const Sophus::SE3d 
             }
         }
     }
-    LOG(INFO) << "num_points: " << num_points << " updatedCells: " << updated;
+    LOG(1) << "num_points: " << num_points << " updatedCells: " << updated;
     return num_points;
 }
 
@@ -384,7 +384,7 @@ int DenseVoxelGrid::addCells ( const std::vector<SurfelInfoT> & surfels, const S
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose(); // << " cp: " << cp;
+    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose(); // << " cp: " << cp;
     return num_points;
 }
 
@@ -476,7 +476,7 @@ int DenseVoxelGrid::addCellsOnGrid ( const std::vector<SurfelInfoT> & surfels, c
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
+    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
     return num_points;
 }
 
@@ -489,8 +489,8 @@ bool DenseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const LevelIn
 {
     ZoneScopedN("DenseVoxelGrid::getSensorCell");
     cellPtrs.clear();
-    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_maps.size()) ) { LOG(INFO) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; return false; } // check lvl bounds
-    if ( ! m_map_params.isInBounds ( pt_s , search_lvl ) ) {  LOG(INFO) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; return false; }
+    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_maps.size()) ) { LOG(1) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; return false; } // check lvl bounds
+    if ( ! m_map_params.isInBounds ( pt_s , search_lvl ) ) {  LOG(1) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; return false; }
 
     cellPtrs.reserve(27);
 

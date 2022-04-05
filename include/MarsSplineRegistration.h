@@ -77,10 +77,18 @@ public:
         m_use_adaptive = adaptive;
     }
 
+    void setScaConstraint ( const bool & sca_use_constraint, const double & sca_factor )
+    {
+        m_sca_use_constraint = sca_use_constraint;
+        m_sca_use_constraint_factor = sca_factor;
+    }
+
 protected:
     // exposed parameters  
     int m_max_iterations = 3;
     bool m_use_adaptive = false;
+    bool m_sca_use_constraint = false;
+    double m_sca_use_constraint_factor = 0.001;
     int m_model_num_points;
     std::vector<int> m_scene_num_points;
     SceneAssociationsVecPtr m_prev_scene_assocs;

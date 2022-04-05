@@ -1,0 +1,7 @@
+<launch>
+  <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v WARNING " output="screen">
+     <param name="config_file_rel" type="str" value="./config/live.cfg" />
+  </node>
+</launch>
+
+

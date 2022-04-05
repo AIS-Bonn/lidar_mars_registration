@@ -40,9 +40,11 @@ static geometry_msgs::Transform sophusToTransform( const Sophus::SE3d & pose )
 
 static Sophus::SE3d transformToSophus ( const geometry_msgs::Transform & transform )
 {
+    const Eigen::Quaterniond q(transform.rotation.w,transform.rotation.x,transform.rotation.y,transform.rotation.z);
+    if ( q.norm() < 1e-1 ) return Sophus::SE3d();
     Sophus::SE3d pose;
     pose.translation() << transform.translation.x, transform.translation.y, transform.translation.z;
-    pose.setQuaternion( Eigen::Quaterniond(transform.rotation.w,transform.rotation.x,transform.rotation.y,transform.rotation.z) );
+    pose.setQuaternion( q );
     return pose;
 }
 

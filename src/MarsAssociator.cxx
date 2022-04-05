@@ -57,7 +57,7 @@ void MarsAssociator<ModelAssociationT>::for_each( )
     m_model_associations->resize(m_scene_cells->size() * 27);
     for ( const SurfelInfoConstPtr & cell : *m_scene_cells )
         (*this)(cell);
-    //LOG(INFO) << "associated: scene: " << m_scene_associations->size() << " valid: "  << (*m_num_valid_scene) << " model: " << m_model_associations->size() << " valid: " << (*m_num_valid_model);
+    //LOG(1) << "associated: scene: " << m_scene_associations->size() << " valid: "  << (*m_num_valid_scene) << " model: " << m_model_associations->size() << " valid: " << (*m_num_valid_model);
     m_scene_associations->erase(m_scene_associations->begin()+*m_num_valid_scene, m_scene_associations->end());
     m_model_associations->erase(m_model_associations->begin()+*m_num_valid_model, m_model_associations->end());
 }

@@ -278,7 +278,7 @@ void BlockSparseVoxelGrid::getCellsAdaptive ( SurfelInfoVector & surfels, int & 
                     const Eigen::Vector3i block_idx_vec = Eigen::Map<const Eigen::Vector3i>(block_index_vec.data());
                     const IndexType ownBlockInsideIdx = m_map_params.fromBlockIndexInsideVectorToBlockIdx ( m_map_params.fromCellIndexVectorToBlockInsideIdx( Eigen::Map<const Eigen::Vector3i>(cell.m_surfel_info.m_index.data()), block_idx_vec ) );
 
-                    //LOG(INFO) << "v2:\n" << v2.row(0) << "\n" << v2.row(1) << "\n" << v2.row(2);
+                    //LOG(1) << "v2:\n" << v2.row(0) << "\n" << v2.row(1) << "\n" << v2.row(2);
                     Eigen::Vector3f fine_normal = cell.m_surfel->normal_;
                     int numChecked = 0;
                     for ( int nIdx = 0; nIdx < v2.cols(); ++nIdx)
@@ -410,7 +410,7 @@ void BlockSparseVoxelGrid::getCellsAdaptive ( SurfelInfoVector & surfels, int & 
     std::vector<int> surfelsPerLevel(m_maps.size(),0);
     for ( const auto & s : surfels )
         ++surfelsPerLevel[s.m_level];
-    LOG(INFO) << "NewAdaptive: per lvl: " << Eigen::Map<Eigen::VectorXi>(surfelsPerLevel.data(),surfelsPerLevel.size(), 1).transpose() << " prCoarser: " << prevUseCoarserLevel.size() << " notCL1: " << notInCenterL1;
+    LOG(1) << "NewAdaptive: per lvl: " << Eigen::Map<Eigen::VectorXi>(surfelsPerLevel.data(),surfelsPerLevel.size(), 1).transpose() << " prCoarser: " << prevUseCoarserLevel.size() << " notCL1: " << notInCenterL1;
 }
 
 void BlockSparseVoxelGrid::getCellsOnLevel ( const IndexType & lvlIdx, SurfelInfoVector & surfels, const bool & omit_center ) const
@@ -513,7 +513,7 @@ int BlockSparseVoxelGrid::addCells ( const std::vector<SurfelInfoT> & surfels, c
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
+    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
     return num_points;
 }
 
@@ -612,7 +612,7 @@ int BlockSparseVoxelGrid::addCellsOnGrid ( const std::vector<SurfelInfoT> & surf
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
+    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
     return num_points;
 }
 
@@ -630,7 +630,7 @@ int BlockSparseVoxelGrid::addCloud( MarsMapPointCloud::Ptr cloud, const Sophus::
     const int num_pts = cloud->size();
 
 
-    LOG(INFO) << "scan id: " << scan_id << " np: " << cloud->size() << " pts: " << cloud->m_points.cols() << " " << pts_s.cols();
+    LOG(1) << "scan id: " << scan_id << " np: " << cloud->size() << " pts: " << cloud->m_points.cols() << " " << pts_s.cols();
     absl::FixedArray<absl::flat_hash_set<CellIndexType>,MapParameters::maxAllowedMapLevels> changedBlocks ( m_map_params.m_num_levels );
     int num_points = 0;
 #ifdef USE_TBB
@@ -685,7 +685,7 @@ int BlockSparseVoxelGrid::addCloud( MarsMapPointCloud::Ptr cloud, const Sophus::
             //#pragma omp atomic
             ++num_points;
         }
-        LOG(INFO) << "lvl: " << lvlIdx << " addedPts: " << num_points << " clb: " << changed_level_blocks.size();
+        LOG(1) << "lvl: " << lvlIdx << " addedPts: " << num_points << " clb: " << changed_level_blocks.size();
     }
 #ifdef USE_TBB
     });
@@ -742,7 +742,7 @@ int BlockSparseVoxelGrid::addCloud( MarsMapPointCloud::Ptr cloud, const Sophus::
             cellsInclFilled[lvlIdx] += c.second.size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " c: " << cloud->size() << " updatedCells: " << updated << " cellsPerLevel: " << cellsFilled.transpose() << " ( " << cellsInclFilled.transpose() << " ) max: " << cellsMaxFilled.transpose();
+    LOG(1) << "num_points: " << num_points << " c: " << cloud->size() << " updatedCells: " << updated << " cellsPerLevel: " << cellsFilled.transpose() << " ( " << cellsInclFilled.transpose() << " ) max: " << cellsMaxFilled.transpose();
     if ( updated == 0 ) LOG(FATAL) << "wtf?";
     return num_points;
 }
@@ -751,8 +751,8 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
 {
     //ZoneScopedN("BlockSparseVoxelGrid::getSensorCell");
     cellPtrs.clear();
-    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_maps.size()) ) { LOG(INFO) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; return false; } // check lvl bounds
-    if ( ! m_map_params.isInBounds ( pt_s , search_lvl ) ) {  LOG(INFO) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; return false; }
+    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_maps.size()) ) { LOG(1) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; return false; } // check lvl bounds
+    if ( ! m_map_params.isInBounds ( pt_s , search_lvl ) ) {  LOG(1) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; return false; }
 
     cellPtrs.reserve(27);
 
@@ -816,7 +816,7 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
             pos_inside_neighbors_z = block_idx_inside_vec_pos_neighbors_z - m_map_params.block_size; // left outmost point
         }
 
-        //LOG(INFO) << "nz: " << pos_outside_z << " iz: " << iz << " nbi: " << new_block_inside_idx_z << " pin: " << pos_inside_neighbors_z;
+        //LOG(1) << "nz: " << pos_outside_z << " iz: " << iz << " nbi: " << new_block_inside_idx_z << " pin: " << pos_inside_neighbors_z;
 
         for ( IndexType iy = 0; iy <= pos_outside_y; ++iy )
         {
@@ -831,7 +831,7 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
                 pos_inside_neighbors_y = block_idx_inside_vec_pos_neighbors_y - m_map_params.block_size; // left outmost point
             }
 
-            //LOG(INFO) << "ny: " << pos_outside_y << " iy: " << iy << " nbi: " << new_block_inside_idx_y  << " pin: " << pos_inside_neighbors_y;
+            //LOG(1) << "ny: " << pos_outside_y << " iy: " << iy << " nbi: " << new_block_inside_idx_y  << " pin: " << pos_inside_neighbors_y;
 
             const int by = block_idx_vec.y()+iy;
             for ( IndexType ix = 0; ix <= pos_outside_x; ++ix )
@@ -856,7 +856,7 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
                         pos_inside_neighbors_x = block_idx_inside_vec_pos_neighbors_x - m_map_params.block_size;
                     }
 
-                    //LOG(INFO) << "nx: " << pos_outside_x << " ix: " << ix << " nbi: " << new_block_inside_idx_x << " pin: " << pos_inside_neighbors_x << " nbiv: " << new_block_idx_vec.transpose() << " nbii: " << Eigen::Vector3i(new_block_inside_idx_x,new_block_inside_idx_y,new_block_inside_idx_z).transpose();
+                    //LOG(1) << "nx: " << pos_outside_x << " ix: " << ix << " nbi: " << new_block_inside_idx_x << " pin: " << pos_inside_neighbors_x << " nbiv: " << new_block_idx_vec.transpose() << " nbii: " << Eigen::Vector3i(new_block_inside_idx_x,new_block_inside_idx_y,new_block_inside_idx_z).transpose();
 
                     for ( IndexType iiz = 0; iiz <= pos_inside_neighbors_z; ++iiz )
                     {
@@ -866,7 +866,7 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
                             const IndexType viiyz = viiz + (new_block_inside_idx_y+iiy) * num_blocks_per_side_y;
                             for ( IndexType iix = 0; iix <= pos_inside_neighbors_x; ++iix )
                             {
-                                //LOG(INFO) << " nbii: " << Eigen::Vector3i(new_block_inside_idx_x+iix,new_block_inside_idx_y+iiy,new_block_inside_idx_z+iiz).transpose();
+                                //LOG(1) << " nbii: " << Eigen::Vector3i(new_block_inside_idx_x+iix,new_block_inside_idx_y+iiy,new_block_inside_idx_z+iiz).transpose();
                                 const IndexType blockInsideIdx = viiyz + (new_block_inside_idx_x+iix) * num_blocks_per_side_x;
                                 const auto cit = block.find(blockInsideIdx);
                                 if ( cit == block.end() ) continue;

@@ -123,13 +123,13 @@ inline void associate ( MarsMap * model, const SurfelInfoConstPtrVector& sceneCe
     StopWatch watch;
     scene_associations.reserve( sceneCells.size());
     model_associations.reserve(27 * sceneCells.size());
-    if ( print_info ) LOG(INFO) << "surfel_registration_debug: associateMaps size() " << sceneCells.size() << " tf:\n"<<transform.params().transpose();
+    if constexpr ( print_info ) LOG(1) << "surfel_registration_debug: associateMaps size() " << sceneCells.size() << " tf:\n"<<transform.params().transpose();
     ZoneScopedN("MarsSplineRegistration::Associate");
     int num_valid_scene = 0;
     int num_valid_model = 0;
     MarsAssociator<ModelAssociationT> af ( model, &sceneCells, &scene_associations, &model_associations, &num_valid_scene, &num_valid_model, transform, neighbors );
     af.for_each();
-    if ( print_info ) LOG(INFO) << "surfel_registration_timing: AssociateFunctor took: " << watch.getTime() << " for " << model_associations.size() << " associations";
+    if constexpr ( print_info ) LOG(1) << "surfel_registration_timing: AssociateFunctor took: " << watch.getTime() << " for " << model_associations.size() << " associations";
 }
 
 #include "MarsSplineRegistrationOMP.hpp"
@@ -163,9 +163,9 @@ bool MarsSplineRegistration::getCovariance( const int & scene_num, const Sophus:
     const Eigen::Matrix6d sym_info = info.cast<double>().selfadjointView<Eigen::Upper>();
     covar = sym_info.inverse();
 
-    //LOG(INFO) << "info:" << info.determinant() <<"\n" << info;
-    //LOG(INFO) << "inf2:" << sym_info.determinant() <<"\n" << sym_info;
-    //LOG(INFO) << "cov:" << covar.determinant() <<"\n" << covar;
+    //LOG(1) << "info:" << info.determinant() <<"\n" << info;
+    //LOG(1) << "inf2:" << sym_info.determinant() <<"\n" << sym_info;
+    //LOG(1) << "cov:" << covar.determinant() <<"\n" << covar;
     //if (! covar.allFinite() ) LOG(FATAL) << "cov not finite !";
     return covar.allFinite();
 }
@@ -173,7 +173,7 @@ bool MarsSplineRegistration::getCovariance( const int & scene_num, const Sophus:
 bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap*> & sceneVec, const Eigen::VectorXt & times, MarsSplineTypePtr & spline, const int & maxIterations )
 {
     //constexpr bool print_info = true;
-    if ( print_info ) LOG(INFO) << "estimateWindowedSplineLM: sv: " << sceneVec.size();
+    if constexpr ( print_info ) LOG(1) << "estimateWindowedSplineLM: sv: " << sceneVec.size();
     StopWatch watch;
 
     constexpr int N = MarsSplineType::N;
@@ -224,10 +224,10 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
             transformed_scene->addCells ( scene_cells, pose_w2 );
             transformed_scene->setPose ( model->getMapPose() );
 
-            if (print_info) LOG(INFO) << "Oidx: " << otherSceneIdx << " modelId: " << model->m_id << " curModel: " << curModel->m_id << " TransformedScene: " << transformed_scene->m_id;
-            if (print_info) LOG(INFO) << "OSI: " << otherSceneIdx << " sc: " << scene_cells.size()<<"\nT:\n"<<currentModellTransforms[otherSceneIdx].params().transpose() << "\nP:\n"<<curModel->getMapPose().params().transpose()
+            if constexpr (print_info) LOG(1) << "Oidx: " << otherSceneIdx << " modelId: " << model->m_id << " curModel: " << curModel->m_id << " TransformedScene: " << transformed_scene->m_id;
+            if constexpr (print_info) LOG(1) << "OSI: " << otherSceneIdx << " sc: " << scene_cells.size()<<"\nT:\n"<<currentModellTransforms[otherSceneIdx].params().transpose() << "\nP:\n"<<curModel->getMapPose().params().transpose()
                       << "\nP2:\n"<<pose_w2.params().transpose() << "\nPP2:\n"<<(transformed_scene->getMapPose().inverse()*pose_w2).params().transpose();
-            if (print_info) LOG(INFO) << "tp:\n" << transformed_scene->getMapPose().params().transpose() << "\npw:\n" << pose_w2.params().transpose() << "\nps1s2:\n"<< (transformed_scene->getMapPose().inverse() * pose_w2).params().transpose();
+            if constexpr (print_info) LOG(1) << "tp:\n" << transformed_scene->getMapPose().params().transpose() << "\npw:\n" << pose_w2.params().transpose() << "\nps1s2:\n"<< (transformed_scene->getMapPose().inverse() * pose_w2).params().transpose();
         }
         const size_t num_scenes = sceneVec.size();
         for ( size_t sceneIdx = 0; sceneIdx < num_scenes; ++sceneIdx )
@@ -243,12 +243,12 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
             paramToModelVec[paramIdx] = otherSceneIdx-1;
             MarsRegistrationDataPair & params = paramVec[paramIdx];
             Sophus::SE3d & currentTransform = currentTransforms[sceneIdx];
-            //LOG(INFO) << "times: " << times.transpose() << " dt: " << spline->getDtNs() << " minT: " << spline->minTimeNs() << " maxT: " << spline->maxTimeNs() ;
+            //LOG(1) << "times: " << times.transpose() << " dt: " << spline->getDtNs() << " minT: " << spline->minTimeNs() << " maxT: " << spline->maxTimeNs() ;
             //spline->print_knots();
             currentTransform = spline->pose ( times(sceneIdx) );
             params.m_scene = scene;
             params.m_model = transformed_scene;
-            if (print_info) LOG(INFO) << "surfel_registration_debug: current_transform["<< sceneIdx<<"]=["<<currentTransform.params().transpose()<<"]";
+            if constexpr (print_info) LOG(1) << "surfel_registration_debug: current_transform["<< sceneIdx<<"]=["<<currentTransform.params().transpose()<<"]";
 
             Sophus::SE3d pose;
             SurfelInfoConstPtrVector scene_cells;
@@ -257,7 +257,7 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
                 scene->getCellsAdaptive( scene_cells, pose );
             else
                 scene->getCells( scene_cells, pose );
-            if (print_info) LOG(INFO) << "surfel_registration_timing: getting cells took : " << newWatch.getTime() << " got cells: " << scene_cells.size();
+            if constexpr (print_info) LOG(1) << "surfel_registration_timing: getting cells took : " << newWatch.getTime() << " got cells: " << scene_cells.size();
             params.m_scene_cells.reserve(scene_cells.size());
             int num_invalid = 0, num_less_pts = 0;
             for ( const SurfelInfoConstPtr & cell : scene_cells )
@@ -269,15 +269,15 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
                 if ( !cell->m_surfel->valid_ || cell->m_surfel->getNumPoints() < 10.0 ) continue;
                 params.m_scene_cells.emplace_back(cell);
             }
-            if ( print_info ) LOG(INFO) << "SceneCells: " << scene_cells.size() << " invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << params.m_scene_cells.size();
+            if constexpr ( print_info ) LOG(1) << "SceneCells: " << scene_cells.size() << " invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << params.m_scene_cells.size();
 
             if ( params.m_scene_cells.empty() )
             {
-                LOG(INFO)  << "MarsSplineRegistration::estimateTransformationLM(): no valid surfels in scene! Forgot to evaluate()?";
+                LOG(1)  << "MarsSplineRegistration::estimateTransformationLM(): no valid surfels in scene! Forgot to evaluate()?";
             }
             params.m_scene_num_points = scene->getNumPoints();
 
-            if (print_info) LOG(INFO) << "surfel_registration_timing: estimateTransformationLM took : " << watch.getTime() << " ( " << newWatch.getTime()<< " ) "
+            if constexpr (print_info) LOG(1) << "surfel_registration_timing: estimateTransformationLM took : " << watch.getTime() << " ( " << newWatch.getTime()<< " ) "
                       << " after scene cells with " << scene_cells.size() << " cells and " << params.m_scene_cells.size() << " valid surfels.";
             params.m_model_num_points = transformed_scene->getNumPoints();
             params.m_transform = &currentTransform;
@@ -300,15 +300,37 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
         assocs.second.resize(params.m_scene_cells.size()*27);
         num_cells(paramIdx) = params.m_scene_cells.size();
     }
-    LOG(INFO) << "registering num_cells: " << num_cells.transpose() << " map: " << model->m_surfels.size();
+    if constexpr (print_info) LOG(1) << "registering num_cells: " << num_cells.transpose() << " map: " << model->m_surfels.size();
+
+    // new experimental soft-constraint for zero acceleration
+    constexpr int min_num_constrained = 1;
+    constexpr int M = 10;
+    const int64_t dt = spline->getDtNs();
+    const int64_t firstTime = spline->minTimeNs();
+    const int64_t begTime = firstTime;
+    const int64_t dtdM = (dt/M);
+    Eigen::Matrix<int64_t,M,1> segment_ts = Eigen::Matrix<int64_t,M,1>::Zero();
+    Eigen::Matrix<int,M,1> used = Eigen::Matrix<int,M,1>::Zero();
+    for ( int idx = 0; idx < M; ++idx )
+    {
+        segment_ts[idx] = begTime + idx * dtdM;
+    }
+    for ( int i = 0; i < times.rows(); ++i )
+    {
+        const int64_t & t = times[i];
+        const int idx = (t - firstTime) % dtdM;
+        if ( idx >= 0 && idx < M )
+            ++used[idx];
+    }
 
     bool retVal = true;
 
     constexpr double init_lambda = 1e-6;
     constexpr double min_lambda = 1e-18;
-    constexpr double max_lambda= 100;
+    constexpr double max_lambda = 100;
     constexpr double stop_thresh = 1e-5;
     constexpr double err_thresh = 1e-4;
+    bool maxed_out_lambda = false;
     double lambda_vee = 2.;
     double lambda = init_lambda;
     double old_error = std::numeric_limits<double>::max();
@@ -318,10 +340,10 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
 
     constexpr int num_neighbors = 1;
     int iter = 0;
-
-    while (iter < maxIterations)
+    bool step = true;
+    while (step && iter < maxIterations)
     {
-        if (print_info) LOG(INFO) << "iteration " << iter << " last error: " << old_error;
+        if constexpr (print_info) LOG(1) << "iteration " << iter << " last error: " << old_error;
         const size_t num_params = paramVec.size();
         for ( size_t paramIdx = 0; paramIdx < num_params; ++paramIdx )
         {
@@ -331,7 +353,7 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
             const size_t & sceneIdx = modelToSceneIds[paramIdx];
             MarsSplineType::PosePosSO3JacobianStruct & jac = currentJac[sceneIdx];
             currentTransforms[sceneIdx] = spline->pose ( times(sceneIdx), &jac );
-            if (print_info) LOG(INFO) << "paramIdx: " << paramIdx << " sceneIdx: " << sceneIdx << " time: "<< times(sceneIdx) << " pose: " << currentTransforms[sceneIdx].params().transpose();
+            if constexpr (print_info) LOG(1) << "paramIdx: " << paramIdx << " sceneIdx: " << sceneIdx << " time: "<< times(sceneIdx) << " pose: " << currentTransforms[sceneIdx].params().transpose();
         }
 
         {
@@ -348,16 +370,20 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
         {
             ZoneScopedN("MarsSplineRegistration::estimate::setupNormalEquations");
             num_valid_assocs = setUpNormalEquations<MarsSplineType>(paramVec,associations,modelToSceneIds,currentTransforms,currentJac,accumH,accumB,accumE,accumW);
+            if ( m_sca_use_constraint )
+            {
+                setUpNormalEquationsSoftConstraints<MarsSplineType,M> ( spline, segment_ts, used, m_sca_use_constraint_factor, accumH, accumB, accumE, accumW );
+            }
         }
         if ( num_valid_assocs == 0 ) LOG(FATAL) << "Could not establish valid associations?";
 
         opt_error = accumE;
-        //if (print_info) LOG(INFO) << "surfel_registration_debug: ret: " << retVal << " err: " << accumE << " took: " << watch.getTime();
+        //if constexpr (print_info) LOG(1) << "surfel_registration_debug: ret: " << retVal << " err: " << accumE << " took: " << watch.getTime();
 
 
         // following Code is modified from Basalt Project
         bool converged = false;
-        bool step = false;
+        step = false;
         int remaining_step_iter = 10;
         VecK Hdiag = accumH.diagonal();
         double max_inc = std::numeric_limits<double>::max();
@@ -380,7 +406,7 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
           const size_t num_knots = new_spline->numKnots();
           for (size_t knot_idx = 0; knot_idx < num_knots; ++knot_idx) {
             const Eigen::Vector6d inc = inc_full.template segment<D>(D * knot_idx).template cast<double>();
-            if (print_info) LOG(INFO) << " remaining_step_iter : " << remaining_step_iter << " knotInc["<<knot_idx<<"]=" << inc.transpose();
+            if constexpr (print_info) LOG(1) << " remaining_step_iter : " << remaining_step_iter << " knotInc["<<knot_idx<<"]=" << inc.transpose();
             if ( !inc.allFinite() ) LOG(FATAL) << "Increment was not valid: " << inc.transpose();
             new_spline->applyInc(knot_idx, inc);
           }
@@ -389,8 +415,12 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
           NormalEquationScalarType newAccumW = 0;
           {
               evalOnce<MarsSplineType> (paramVec, associations, modelToSceneIds, new_spline, times, newAccumE, newAccumW );
+
+              if ( m_sca_use_constraint )
+              {
+                  evalSoftConstraintsOnce<MarsSplineType,M> ( new_spline, segment_ts, used, m_sca_use_constraint_factor, newAccumE, newAccumW );
+              }
           }
-          newAccumE /= newAccumW;
 
           const double new_spline_error = newAccumE;
           const double f_diff = (opt_error - new_spline_error);
@@ -399,15 +429,32 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
 
           const double step_quality = f_diff / l_diff;
           if (step_quality < 0 ) {
-              //if (print_info)
-              //              LOG(INFO) << "it: " << iter << " [REJECTED] lambda:" << lambda
-              //                        << " step_quality: " << step_quality
-              //                        << " max_inc: " << max_inc << " Error: " << new_spline_error << " oldError: " << opt_error;
-              lambda = std::min(max_lambda, lambda_vee * lambda);
-              lambda_vee *= 2;
+              if  (! maxed_out_lambda )
+              {
+                  if constexpr(print_info)
+                  LOG(1) << "it: " << iter << " [REJECTED] lambda:" << lambda
+                            << " step_quality: " << step_quality
+                            << " max_inc: " << max_inc << " Error: " << new_spline_error << " oldError: " << opt_error;
+                  const double new_lambda = lambda_vee * lambda;
+                  if ( new_lambda > max_lambda )
+                  {
+                      maxed_out_lambda = true;
+                  }
+                  lambda = std::min(max_lambda, new_lambda );//lambda_vee * lambda);
+                  lambda_vee *= 2;
+              }
+              else
+              {
+                  if constexpr(print_info)
+                  LOG(1) << "it: " << iter << " [STOP] lambda:" << lambda
+                            << " step_quality: " << step_quality
+                            << " max_inc: " << max_inc << " Error: " << new_spline_error << " oldError: " << opt_error;
+                  converged = true;
+                  // STOP wasting time ! next iteration actually wont help
+              }
           } else {
-              if (print_info)
-                LOG(INFO) << "it: " << iter << " [ACCEPTED] lambda:" << lambda
+              if constexpr (print_info)
+                LOG(1) << "it: " << iter << " [ACCEPTED] lambda:" << lambda
                           << " step_quality: " << step_quality
                           << " max_inc: " << max_inc << " Error: " << new_spline_error << " oldError: " << opt_error;
               lambda = std::max( min_lambda, lambda * std::max(1.0 / 3, 1 - std::pow(2 * step_quality - 1, 3.0)));
@@ -415,6 +462,7 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
               spline = new_spline;
               opt_error = new_spline_error;
               step = true;
+              maxed_out_lambda = false;
           }
           --remaining_step_iter;
         }
@@ -423,11 +471,11 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
 
         if ( ! std::isfinite(opt_error) )
         {
-            LOG(INFO) << "surfel_registration_debug: registration failed " << old_error << " new_error "<< opt_error;
+            LOG(WARNING) << "surfel_registration_debug: registration failed " << old_error << " new_error "<< opt_error;
             return false;
         }
-        if (print_info)
-            LOG(INFO) << "surfel_registration_debug: after update eval took : " << watch.getTime() << " last_error: " << old_error << " new_error: " << opt_error << " conv: " << converged << " errorDiff: " << std::abs(old_error - opt_error) << " maxInc: " << max_inc;
+        if constexpr (print_info)
+            LOG(1) << "surfel_registration_debug: after update eval took : " << watch.getTime() << " last_error: " << old_error << " new_error: " << opt_error << " conv: " << converged << " errorDiff: " << std::abs(old_error - opt_error) << " maxInc: " << max_inc;
         if ( converged || std::abs(old_error - opt_error) < err_thresh || max_inc < stop_thresh )
         {
             old_error = opt_error;
@@ -470,8 +518,8 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
     }
     static float watch_max = watch.getTime();
     if ( watch.getTime() > watch_max ) watch_max = watch.getTime();
-    if ( print_info )
-    LOG(INFO) << "Timing: overall: "<< watch.getTime()<< " (max: " << watch_max << " ) ";
+    if constexpr ( print_info )
+    LOG(1) << "Timing: overall: "<< watch.getTime()<< " (max: " << watch_max << " ) ";
 //              << " paramConnectTime: " << paramConnectTime << " iterPrepTime: "<< iterPrepTime
 //              << " iterAssocTime: " << iterAssocTime << " iterGradTime: " << iterGradTime << " ( dk: " << iterDkTime << " cov: " << iterCovTime << ", gradMul: " << iterGradMulTime << " Dx: " << iterGradMulDxTime  << " Add: " << iterGradMulAddTime << " )"
 //              << " iterLMTime: " << iterLMTime << " ( Cov: " << iterLMCovTime << " ) iterPostTime: " << iterPostTime << " ( spline: " << iterPostSplineTime << ", tf: " << iterPostTransformTime << ")";
@@ -481,18 +529,18 @@ bool MarsSplineRegistration::estimate( MarsMap* model, const std::vector<MarsMap
     ++num_estims;
     sum_iters += iter;
 
-    //if ( print_info )
-    LOG(INFO) << "surfel_registration_timing: estimateTransformationLM took: " << watch.getTime()
+    if constexpr ( print_info )
+    LOG(1) << "surfel_registration_timing: estimateTransformationLM took: " << watch.getTime()
               << " after " << iter << " iterations. ( avg= " << (sum_iters/float(num_estims)) << " )";
     if (iter == maxIterations)
-        if ( print_info ) LOG(INFO) << "estimateTransformationLM: maximum number of iterations (" << maxIterations << ") reached ";
+        if constexpr ( print_info ) LOG(1) << "estimateTransformationLM: maximum number of iterations (" << maxIterations << ") reached ";
     return std::isfinite(opt_error);
 }
 
 // following Code is modified from Basalt Project
 void MarsSplineRegistration::optimizeSplineKnotsFromPoses ( MarsSplineTypePtr & spline, const Eigen::VectorXt & times, const std::vector<Sophus::SE3d> & poses ) const
 {
-    if ( print_info ) LOG(INFO) << "opt knots from poses. t: " << times.transpose();
+    if constexpr ( print_info ) LOG(1) << "opt knots from poses. t: " << times.transpose();
     constexpr double init_lambda = 1e-6;
     constexpr double min_lambda = 1e-18;
     constexpr double max_lambda= 100;
@@ -516,16 +564,35 @@ void MarsSplineRegistration::optimizeSplineKnotsFromPoses ( MarsSplineTypePtr & 
     double lambda_vee = 2.;
     double accumE = 0;
     double old_error = std::numeric_limits<double>::max();
-    std::vector<Sophus::SE3d> meas_pose_inv ( poses.size() );
-    for ( size_t posesIdx = 0; posesIdx < poses.size(); ++posesIdx )
-        meas_pose_inv[posesIdx] = poses[posesIdx].inverse();
     MarsSplineTypePtr new_spline = std::make_shared<MarsSplineType> ( spline->getDtNs(), spline->minTimeNs() );
     new_spline->setKnots( spline->getKnot(0), N );
     for (size_t knot_idx = 0; knot_idx < new_spline->numKnots(); ++knot_idx)
         new_spline->setKnot(spline->getKnot(knot_idx),knot_idx);
     MarsSplineType::PosJacobianStruct Jp;
+    MarsSplineType::PosJacobianStruct Ja;
     MarsSplineType::SO3JacobianStruct Jr;
     Eigen::Matrix<double,D,ND> Dx;
+
+    // new experimental soft-constraint for zero acceleration
+    constexpr int min_num_constrained = 1;
+    constexpr int M = 10;
+    const int64_t dt = spline->getDtNs();
+    const int64_t firstTime = spline->minTimeNs();
+    const int64_t begTime = firstTime;
+    const int64_t dtdM = (dt/M);
+    Eigen::Matrix<int64_t,M,1> segment_ts = Eigen::Matrix<int64_t,M,1>::Zero();
+    Eigen::Matrix<int,M,1> used = Eigen::Matrix<int,M,1>::Zero();
+    for ( int idx = 0; idx < M; ++idx )
+    {
+        segment_ts[idx] = begTime + idx * dtdM;
+    }
+    for ( int i = 0; i < times.rows(); ++i )
+    {
+        const int64_t & t = times[i];
+        const int idx = (t - firstTime) % dtdM;
+        if ( idx >= 0 && idx < M )
+            ++used[idx];
+    }
 
     for ( iter = 0; iter < maxIter; ++iter )
     {
@@ -550,6 +617,31 @@ void MarsSplineRegistration::optimizeSplineKnotsFromPoses ( MarsSplineTypePtr & 
             accumB += (Dx.transpose()* diff);
             accumE += error;
         }
+        if ( m_sca_use_constraint )
+        {
+            Dx.setZero();
+            diff.setZero();
+
+            for ( int idx = 0; idx < M; ++idx )
+            {
+                const int64_t t = segment_ts[idx];
+                if ( used[idx] >= min_num_constrained ) continue;
+
+                const Sophus::Vector3d diff_acc = spline->transAccelWorldResidual( t, Eigen::Vector3d::Zero(), &Ja );
+                const Sophus::Vector3d diff_rot = spline->rotAccelBodyResidual( t, Eigen::Vector3d::Zero(), &Jr );
+                diff.head<3>() = diff_acc;
+                diff.tail<3>() = diff_rot;
+
+                for (int i = 0; i < N; ++i) {
+                    Dx.template block<3,3>(0,D*i) = Ja.d_val_d_knot[i] * Eigen::Matrix3d::Identity(); // pos
+                    Dx.template block<3,3>(3,D*i+3) = Jr.d_val_d_knot[i]; // rot
+                }
+                const double error = .5 * diff.dot(diff);
+                accumB += (Dx.transpose() * m_sca_use_constraint_factor * diff);
+                accumH += (Dx.transpose() * m_sca_use_constraint_factor * Dx);
+                accumE += m_sca_use_constraint_factor * error;
+            }
+        }
 
         bool converged = accumE < err_thresh;
         bool step = false;
@@ -569,7 +661,7 @@ void MarsSplineRegistration::optimizeSplineKnotsFromPoses ( MarsSplineTypePtr & 
             for (size_t knot_idx = 0; knot_idx < new_spline->numKnots(); ++knot_idx) {
                 new_spline->setKnot(spline->getKnot(knot_idx),knot_idx);
                 Eigen::Vector6d inc = inc_full.template segment<D>(D * knot_idx);
-                if ( print_info ) LOG(INFO) << " remaining_step_iter : " << remaining_step_iter << " knotInc["<<knot_idx<<"]=" << inc.transpose();
+                if constexpr( print_info ) LOG(1) << " remaining_step_iter : " << remaining_step_iter << " knotInc["<<knot_idx<<"]=" << inc.transpose();
                 new_spline->applyInc(knot_idx, inc);
             }
 
@@ -582,9 +674,22 @@ void MarsSplineRegistration::optimizeSplineKnotsFromPoses ( MarsSplineTypePtr & 
                 const Sophus::Vector3d diff_so3 = new_spline->orientationResidual( t, poses[posesIdx].so3() );
                 diff.head<3>() = diff_pos;
                 diff.tail<3>() = diff_so3;
-                if ( print_info ) LOG(INFO) << "newErr["<<posesIdx<<"]: " << diff.transpose();
+                if constexpr ( print_info ) LOG(1) << "newErr["<<posesIdx<<"]: " << diff.transpose();
                 const double error = .5 * diff.dot(diff);
                 newAccumE += error;
+            }
+            if ( m_sca_use_constraint )
+            {
+                for ( int idx = 0; idx < M; ++idx )
+                {
+                    const int64_t t = segment_ts[idx];
+                    if ( used[idx] >= min_num_constrained ) continue;
+                    const Sophus::Vector3d diff_acc = new_spline->transAccelWorldResidual( t, Eigen::Vector3d::Zero() );
+                    const Sophus::Vector3d diff_rot = new_spline->rotAccelBodyResidual( t, Eigen::Vector3d::Zero() );
+                    const double error_acc = .5 * diff_acc.dot(diff_acc);
+                    const double error_rot = .5 * diff_rot.dot(diff_rot);
+                    newAccumE += m_sca_use_constraint_factor * (error_acc + error_rot);
+                }
             }
 
             const double f_diff = (accumE - newAccumE);
@@ -593,14 +698,14 @@ void MarsSplineRegistration::optimizeSplineKnotsFromPoses ( MarsSplineTypePtr & 
 
             const double step_quality = f_diff / l_diff;
             if (step_quality < 0 ) {
-                //if (print_info)
-                //              LOG(INFO) << "it: " << iter << " [REJECTED] lambda:" << lambda << " step_quality: " << step_quality
+                //if constexpr (print_info)
+                //              LOG(1) << "it: " << iter << " [REJECTED] lambda:" << lambda << " step_quality: " << step_quality
                 //                        << " max_inc: " << max_inc << " Error: " << newAccumE << " oldError: " << accumE;
                 lambda = std::min(max_lambda, lambda_vee * lambda);
                 lambda_vee *= 2;
             } else {
-                if (print_info)
-                LOG(INFO) << "it: " << iter << " [ACCEPTED] lambda:" << lambda << " step_quality: " << step_quality
+                if constexpr (print_info)
+                LOG(1) << "it: " << iter << " [ACCEPTED] lambda:" << lambda << " step_quality: " << step_quality
                           << " max_inc: " << max_inc << " Error: " << newAccumE << " oldError: " << accumE;
                 lambda = std::max( min_lambda, lambda * std::max(1.0 / 3, 1 - std::pow(2 * step_quality - 1, 3.0)));
                 lambda_vee = 2;
@@ -614,10 +719,10 @@ void MarsSplineRegistration::optimizeSplineKnotsFromPoses ( MarsSplineTypePtr & 
         }
         if ( converged || std::abs(old_error - accumE) < err_thresh || max_inc < stop_thresh )
         {
-            if ( print_info ) LOG(INFO) << "converged: " << converged << " abs: " <<  std::abs(old_error - accumE) << " maxInc: "<< max_inc; old_error = accumE;
+            if constexpr ( print_info ) LOG(1) << "converged: " << converged << " abs: " <<  std::abs(old_error - accumE) << " maxInc: "<< max_inc; old_error = accumE;
             break;
         }
         old_error = accumE;
     }
-    LOG(INFO) << "With PoseSpline needed " << iter << " iterations with err: " << old_error << " and took: " << watch.getTime() << " seconds";
+    if constexpr (print_info ) LOG(1) << "With PoseSpline needed " << iter << " iterations with err: " << old_error << " and took: " << watch.getTime() << " seconds";
 }

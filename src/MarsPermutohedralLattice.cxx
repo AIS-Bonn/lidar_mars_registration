@@ -946,6 +946,14 @@ bool PermutohedralLattice<P>::getSensorCell ( const Eigen::Vector3f & pt_s, cons
     }
     key[pos_dim] = - key.template head<3>().sum();
     const auto & map_level = m_maps_surfel_info[search_lvl];
+    {
+        const CellIndexType v1 ({{key[0],key[1],key[2]}});
+        const auto it = map_level.find( v1 );
+        if ( it != map_level.end() )
+        {
+            cellPtrs.emplace_back(it->second);
+        }
+    }
     VecHi n1_key;
     VecHi n2_key;
     // along each axis

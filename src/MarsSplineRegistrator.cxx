@@ -95,8 +95,10 @@ void MarsSplineRegistrator::init_params(const std::string & config_file){
     m_keyframe_use_rotation = dyn_config["keyframe_use_rotation"];
     m_min_keyframe_rotation = double(dyn_config["min_keyframe_rotation"]) * M_PI/180.;
     m_min_keyframe_distance = dyn_config["min_keyframe_distance"];
-    m_use_adaptive = dyn_config["use_adaptive"];
     m_use_closest_kf = dyn_config["use_closest_keyframe"];
+    m_use_adaptive = dyn_config["use_adaptive"];
+    bool sca_use_constraint = dyn_config["sca_use_constraint"];
+    double sca_constraint_factor = dyn_config["sca_constraint_factor"];
 
     MapParameters::plane_scale_factor = dyn_config["plane_scale_factor"];
     MapParameters::first_ev_planarity_threshold = dyn_config["first_ev_planarity_threshold"];
@@ -128,7 +130,8 @@ void MarsSplineRegistrator::init_params(const std::string & config_file){
     m_localMarsMap = MarsMapWindow::create( m_local_map_window, false, true );
     m_sceneMarsMap = MarsMapWindow::create( m_scene_map_window, true, m_use_adaptive );
     m_marsRegistrator = MarsSplineRegistration::create( );
-    m_marsRegistrator->setUseAdaptive(m_use_adaptive);
+    m_marsRegistrator->setUseAdaptive ( m_use_adaptive );
+    m_marsRegistrator->setScaConstraint ( sca_use_constraint, sca_constraint_factor );
 
     const double dt = 0.1;
     m_trajectory_spline = std::make_shared<MarsSplineType>( TimeConversion::to_ns(dt), 0 );
@@ -166,7 +169,7 @@ typename VisMesh::Ptr showSemanticColored( typename T::Ptr scene_cloud, const So
             if ( pt_prob.col(i).isApproxToConstant(pt_prob.col(i)(0),1e-10) ) continue;
             int idx = 0;
             pt_prob.col(i).maxCoeff(&idx);
-            //LOG(INFO) << "s["<<i<<"]: " << pt_prob.col(i).transpose() << " " << idx;
+            //LOG(1) << "s["<<i<<"]: " << pt_prob.col(i).transpose() << " " << idx;
             vm->addPoint( (interp_scene_pose * pts.col(i).cast<double>()).cast<float>(), Eigen::Vector3f::Constant(idx), intensity.rows()>0 ? &intensity(idx) : nullptr, reflectivity.rows()>0 ? &reflectivity(idx) : nullptr );
         }
     }
@@ -189,7 +192,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
 
     static Eigen::VectorXt oldTimes;
 
-    LOG(INFO) << "sceneCloud: " << sceneCloud->size() << " " << sceneCloud->m_points.cols() << " id:" << sceneCloud->m_scan_id;
+    //LOG(1) << "sceneCloud: " << sceneCloud->size() << " " << sceneCloud->m_points.cols() << " id:" << sceneCloud->m_scan_id;
 
     if ( ! m_sceneMarsMap ) LOG(FATAL) << "no scene map.";
     if ( ! m_localMarsMap ) LOG(FATAL) << "no local map.";
@@ -310,7 +313,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
         const Sophus::SE3d new_cur_pose = m_localMarsMap->local_map_pose.inverse() * m_cur_pose;
         std::unique_lock<std::mutex> lock(m_sceneMapMutex);
         m_sceneMarsMap->addCloud(sceneCloud, new_cur_pose);
-        //LOG(INFO) << "lmpi: " <<  m_localMarsMap->local_map_pose.inverse().params().transpose() << " cp: " <<  cur_pose.params().transpose() << " ncp: " << new_cur_pose.params().transpose();
+        //LOG(1) << "lmpi: " <<  m_localMarsMap->local_map_pose.inverse().params().transpose() << " cp: " <<  cur_pose.params().transpose() << " ncp: " << new_cur_pose.params().transpose();
         std::vector<MarsMap*> sceneMapPtrVec = m_sceneMarsMap->getMapPtrVec( ); // sceneMaps now in frame of local map
         while ( m_scene_surfels.size() >= sceneMapPtrVec.size() )
             m_scene_surfels.pop_front();
@@ -379,10 +382,10 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                     new_pose_wi.translation() = P_wi.translation() + v_w * dt; // + 0.5 * a_wi * dt * dt;
                     new_pose_wi.so3() = P_wi.so3() * Sophus::SO3d::exp( dt * r_i );
 
-                    //LOG(INFO) << "r: " << r_i.transpose() //<< " a: " << a_w.transpose()
+                    //LOG(1) << "r: " << r_i.transpose() //<< " a: " << a_w.transpose()
                     //          << " v: " << v_w.transpose() << " dt: " << dt << " t: " << P_wi.translation().transpose();
-                    //LOG(INFO) << "|vs_w|: "<< vs_w.colwise().norm();
-                    //LOG(INFO) << "PreInterp=["<<poseTimes.rows()<<"]=["<< new_pose_wi.translation().transpose()<<"]";
+                    //LOG(1) << "|vs_w|: "<< vs_w.colwise().norm();
+                    //LOG(1) << "PreInterp=["<<poseTimes.rows()<<"]=["<< new_pose_wi.translation().transpose()<<"]";
 
                     poses.emplace_back( new_pose_wi );
                 }
@@ -391,7 +394,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             }
         }
 
-        //LOG(INFO) << "numPoses: " << poses.size() << " poseTimes: " << poseTimes.transpose() << " oldTimes: " << oldTimes.transpose() << " curTimes: " << curTimes.transpose();
+        //LOG(1) << "numPoses: " << poses.size() << " poseTimes: " << poseTimes.transpose() << " oldTimes: " << oldTimes.transpose() << " curTimes: " << curTimes.transpose();
         m_marsRegistrator->optimizeSplineKnotsFromPoses ( interpolated_spline, poseTimes, poses );
         for ( int cloudIdx = 0; cloudIdx < poseTimes.rows(); ++cloudIdx)
         {
@@ -401,13 +404,13 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             const Sophus::Vector3d trans_error = interpolated_spline->positionResidual(t,ref_pose.translation());
             const Sophus::Vector3d rot_error = interpolated_spline->orientationResidual(t,ref_pose.so3());
             if ( rot_error.norm() > 0.1 || trans_error.norm() > 0.05 )
-              LOG(INFO) << "PreInterp["<<cloudIdx<<"]=["<<interpolated_spline_pose.params().transpose()<<"] diff: " << rot_error.transpose() << " (| "<< rot_error.norm()<< " |)" << trans_error.transpose() << " (|"<< trans_error.norm()<<" |)";
+              LOG(WARNING) << "PreInterp["<<cloudIdx<<"]=["<<interpolated_spline_pose.params().transpose()<<"] diff: " << rot_error.transpose() << " (| "<< rot_error.norm()<< " |)" << trans_error.transpose() << " (|"<< trans_error.norm()<<" |)";
         }
         m_trajectory_spline = interpolated_spline;
     }
     else
     {
-        //LOG(INFO) << "Not enough entries yet.";
+        //LOG(1) << "Not enough entries yet.";
         if ( curTimes.rows() == 1 && oldTimes.rows() == 0 ) // just initialized, now set to estimated diff
         {
             const int64_t maxTime = curTimes.tail<1>()[0] + 1 + TimeConversion::to_ns(m_interpolationTimeOffset);
@@ -484,13 +487,13 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             if ( t_inc % 50 == 0 )
                 points.col(t_inc/50) = interp_scene_pose.translation();
         }
-        LOG(INFO) << "lm_t: " << m_localMarsMap->local_map_pose.translation().transpose();
-        LOG(INFO) << "ps_t: " << prev_scene_pose.translation().transpose();
-        LOG(INFO) << "sceneTimes: " << sceneTimes.transpose();
-        LOG(INFO) << "knot_t:\n" << knot_translation;
-        LOG(INFO) << "scene_t:\n" << scene_translation;
-        LOG(INFO) << "interp_t:\n" << interp_translation;
-        LOG(INFO) << "\n" << points;
+        LOG(1) << "lm_t: " << m_localMarsMap->local_map_pose.translation().transpose();
+        LOG(1) << "ps_t: " << prev_scene_pose.translation().transpose();
+        LOG(1) << "sceneTimes: " << sceneTimes.transpose();
+        LOG(1) << "knot_t:\n" << knot_translation;
+        LOG(1) << "scene_t:\n" << scene_translation;
+        LOG(1) << "interp_t:\n" << interp_translation;
+        LOG(1) << "\n" << points;
         km->showPointMesh("InitKnotPoses"+std::to_string(m_scan_id),true);
         bm->showPointMesh("InitScanPose"+std::to_string(m_scan_id),true);
         sm->showPointMesh("InitInterpPose"+std::to_string(m_scan_id),true);
@@ -531,7 +534,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
         successfulRegistration = m_marsRegistrator->estimate ( asOneCenteredLocalMap.get(), sceneMapPtrVec, sceneTimes, m_trajectory_spline, m_max_iterations );
     }
 
-    LOG(INFO) << "Reg was succesful: " << successfulRegistration;
+    //LOG(1) << "Reg was succesful: " << successfulRegistration;
 
     Sophus::SE3d newest_cloud_pose = prev_scene_pose;
     {
@@ -555,11 +558,11 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
         m_current_pose_cov = covar;
     }
 
-    for ( int cloudIdx = 0; cloudIdx < curTimes.rows(); ++cloudIdx)
-    {
-        Sophus::SE3d pre_interpolated_pose_se3 = m_trajectory_spline->pose(curTimes(cloudIdx) );
-        LOG(INFO) << "RegInterp["<<cloudIdx<<"]=["<<pre_interpolated_pose_se3.params().transpose()<<"]";
-    }
+//    for ( int cloudIdx = 0; cloudIdx < curTimes.rows(); ++cloudIdx)
+//    {
+//        Sophus::SE3d pre_interpolated_pose_se3 = m_trajectory_spline->pose(curTimes(cloudIdx) );
+//        LOG(1) << "RegInterp["<<cloudIdx<<"]=["<<pre_interpolated_pose_se3.params().transpose()<<"]";
+//    }
 
 
 #ifdef USE_EASY_PBR
@@ -607,11 +610,11 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             if ( t_inc % 50 == 0 )
                 points.col(t_inc/50) = interp_scene_pose.translation();
         }
-        //LOG(INFO) << "sceneTimes: " << sceneTimes.transpose();
-        //LOG(INFO) << "knot_t:\n" << knot_translation;
-        //LOG(INFO) << "scene_t:\n" << scene_translation;
-        //LOG(INFO) << "interp_t:\n" << interp_translation;
-        //LOG(INFO) << "\n" << points;
+        //LOG(1) << "sceneTimes: " << sceneTimes.transpose();
+        //LOG(1) << "knot_t:\n" << knot_translation;
+        //LOG(1) << "scene_t:\n" << scene_translation;
+        //LOG(1) << "interp_t:\n" << interp_translation;
+        //LOG(1) << "\n" << points;
         km->showPointMesh("KnotPoses"+std::to_string(m_scan_id),true);
         bm->showPointMesh("ScanPose"+std::to_string(m_scan_id),true);
         sm->showPointMesh("InterpPose"+std::to_string(m_scan_id),true);
@@ -721,9 +724,9 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 p.addEdge(interp_scene_pose.translation().cast<float>(), interp_scene_pose.cast<float>()*v1y, rc);
                 p.addEdge(interp_scene_pose.translation().cast<float>(), interp_scene_pose.cast<float>()*v1z, rc );
                 p.showEdgeMesh("Eigs_"+std::to_string(idx),true);
-                LOG(INFO) << "Kappa: " << (std::abs(eigs.eigenvalues()(2))/(std::abs(eigs.eigenvalues()(0))));
-                LOG(INFO) << "Att=[" << a.row(0) <<"; "<< a.row(1) << "; " << a.row(2) << "]";
-                LOG(INFO) << "Evs=[" << sevs.row(0) <<"; "<< sevs.row(1) << "; " << sevs.row(2) << "]";
+                LOG(1) << "Kappa: " << (std::abs(eigs.eigenvalues()(2))/(std::abs(eigs.eigenvalues()(0))));
+                LOG(1) << "Att=[" << a.row(0) <<"; "<< a.row(1) << "; " << a.row(2) << "]";
+                LOG(1) << "Evs=[" << sevs.row(0) <<"; "<< sevs.row(1) << "; " << sevs.row(2) << "]";
             }
             if ( !an.isZero() )
             {
@@ -743,9 +746,9 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 p.addEdge(interp_scene_pose.translation().cast<float>(), interp_scene_pose.cast<float>()*v1y, rc);
                 p.addEdge(interp_scene_pose.translation().cast<float>(), interp_scene_pose.cast<float>()*v1z, rc );
                 p.showEdgeMesh("NEigs_"+std::to_string(idx),true);
-                LOG(INFO) << "NKappa: " << (std::abs(eigs.eigenvalues()(2))/(std::abs(eigs.eigenvalues()(0))));
-                LOG(INFO) << "NAtt=[" << an.row(0) <<"; "<< an.row(1) << "; " << an.row(2) << "]";
-                LOG(INFO) << "NEvs=[" << sevs.row(0) <<"; "<< sevs.row(1) << "; " << sevs.row(2) << "]";
+                LOG(1) << "NKappa: " << (std::abs(eigs.eigenvalues()(2))/(std::abs(eigs.eigenvalues()(0))));
+                LOG(1) << "NAtt=[" << an.row(0) <<"; "<< an.row(1) << "; " << an.row(2) << "]";
+                LOG(1) << "NEvs=[" << sevs.row(0) <<"; "<< sevs.row(1) << "; " << sevs.row(2) << "]";
             }
         }
     }
@@ -808,22 +811,22 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                         p.addEdge(v1.cast<float>(), v2.cast<float>(), rc);
                     }
                     p.showEdgeMesh("eigs_"+std::to_string(idx),true);
-                    LOG(INFO) << "kappa: " << (std::abs(eigs.eigenvalues()(2))/(std::abs(eigs.eigenvalues()(0))));
-                    LOG(INFO) << "Att=[" << Att.row(0) <<"; "<< Att.row(1) << "; " << Att.row(2) << "]";
-                    LOG(INFO) << "att=[" << a.row(0) <<"; "<< a.row(1) << "; " << a.row(2) << "]";
-                    LOG(INFO) << "evs=[" << sevs.row(0) <<"; "<< sevs.row(1) << "; " << sevs.row(2) << "]";
+                    LOG(1) << "kappa: " << (std::abs(eigs.eigenvalues()(2))/(std::abs(eigs.eigenvalues()(0))));
+                    LOG(1) << "Att=[" << Att.row(0) <<"; "<< Att.row(1) << "; " << Att.row(2) << "]";
+                    LOG(1) << "att=[" << a.row(0) <<"; "<< a.row(1) << "; " << a.row(2) << "]";
+                    LOG(1) << "evs=[" << sevs.row(0) <<"; "<< sevs.row(1) << "; " << sevs.row(2) << "]";
                 }
 
-                LOG(INFO) << "\n\nc1: " << c1.getTime();
+                LOG(1) << "\n\nc1: " << c1.getTime();
                 s1.reset();
                 v.showSurfelMesh("sceneSurfelsPreInt_"+std::to_string(idx), true, interp_scene_pose,m_surfel_type);
-                LOG(INFO) << "s1: " << s1.getTime();
+                LOG(1) << "s1: " << s1.getTime();
                 //n.showEdgeMesh("sceneSurfelPreIntNormals_"+std::to_string(idx), true, interp_scene_pose);
                 //f.showEdgeMesh("sceneSurfelPreIntFirstViewDir_"+std::to_string(idx), true, interp_scene_pose);
                 //e.showPointMesh("sceneSurfelPreIntNotValidMean_"+std::to_string(idx), true, interp_scene_pose);
                 //p.showPointMesh("sceneSurfelPreIntTooLittlePoints_"+std::to_string(idx), true, interp_scene_pose);
             }
-            LOG(INFO) << "total: " << total.getTime();
+            LOG(1) << "total: " << total.getTime();
         }
 #endif
 #ifdef USE_EASY_PBR
@@ -857,12 +860,12 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
 
     if ( m_sceneMarsMap->hasFullWindow() )
     {
-        //LOG(INFO) << "Moving Scene!";
+        //LOG(1) << "Moving Scene!";
         {
             std::unique_lock<std::mutex> lock(m_sceneMapMutex);
             m_sceneMarsMap->moveWindowToNext();
         }
-        //LOG(INFO) << "Moved Scene!";
+        //LOG(1) << "Moved Scene!";
         // get last cloud from scene map
         MarsMapPointCloud::Ptr old_last_scene_cloud = m_sceneMarsMap->getOutOfWindowCloud();
         assert ( old_last_scene_cloud != nullptr );
@@ -898,7 +901,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 //    e.addSurfelTriangleEllipsoid(eigen_vectors, eigen_values, cell->m_center_s + cell->m_surfel->mean_, rc, asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell->m_level)/2);
                 //    //e.addPoint( cell->m_center_s, rc );
                 //}
-                //if ( ! cell->m_surfel->valid_ && cell->m_surfel->getNumPoints() >= 10.0 ) LOG(INFO) << "PrevMarsSurfel: invalid. mcs: " << cell->m_center_s.transpose() << " #:" << cell->m_surfel->getNumPoints() << " cov=[" << cell->m_surfel->cov_.row(0)<<"; " << cell->m_surfel->cov_.row(1) << "; " <<cell->m_surfel->cov_.row(2)<<"]; dc: " << cell->m_surfel->cov_.determinant() << " ddc: " << cell->m_surfel->cov_.determinant()<< " eps: " << std::numeric_limits<Surfel::Scalar>::epsilon();
+                //if ( ! cell->m_surfel->valid_ && cell->m_surfel->getNumPoints() >= 10.0 ) LOG(1) << "PrevMarsSurfel: invalid. mcs: " << cell->m_center_s.transpose() << " #:" << cell->m_surfel->getNumPoints() << " cov=[" << cell->m_surfel->cov_.row(0)<<"; " << cell->m_surfel->cov_.row(1) << "; " <<cell->m_surfel->cov_.row(2)<<"]; dc: " << cell->m_surfel->cov_.determinant() << " ddc: " << cell->m_surfel->cov_.determinant()<< " eps: " << std::numeric_limits<Surfel::Scalar>::epsilon();
                 //if ( cell->m_surfel->getNumPoints() < 10.0 ) p.addPoint( cell->m_center_s, rc );
                 if ( !cell->m_surfel->valid_ || cell->m_surfel->getNumPoints() < 10.0 ) continue;
                 //n.addNormal( (cell->m_center_s + cell->m_surfel->mean_), cell->m_surfel->normal_, rc);
@@ -919,13 +922,13 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
         const Sophus::SO3d diff_rot = (last_kf_pose.so3().inverse() * new_scene_pose.so3());
         const bool kf_from_rotation = Eigen::Vector2d(diff_rot.angleX(),diff_rot.angleY()).norm() > m_min_keyframe_rotation;
         const bool shouldCreateKeyFrame = (last_kf_pose.translation()-new_scene_pose.translation()).norm() > m_min_keyframe_distance || (m_keyframe_use_rotation && kf_from_rotation);
-        //LOG(INFO) << "KF? " << shouldCreateKeyFrame << " t: " << (last_kf_pose.translation()-new_scene_pose.translation()).transpose() << " nt: " << (last_kf_pose.translation()-new_scene_pose.translation()).squaredNorm() << " th: " << m_min_keyframe_distance;
+        //LOG(1) << "KF? " << shouldCreateKeyFrame << " t: " << (last_kf_pose.translation()-new_scene_pose.translation()).transpose() << " nt: " << (last_kf_pose.translation()-new_scene_pose.translation()).squaredNorm() << " th: " << m_min_keyframe_distance;
         if ( shouldCreateKeyFrame )
         {
             m_was_keyframe = true;
             m_last_key_frame_stamp = old_last_scene_cloud->m_stamp;
-            LOG(INFO) << "last_kf_t: " << last_kf_pose.translation().transpose() << " new_scene_t: "<<  new_scene_pose.translation().transpose();
-            //LOG(INFO) << "last_kf_t: " << (m_localMarsMap->local_map_pose*prev_scene_pose*last_kf_pose.translation()).transpose() << " new_scene_t: "<<  (m_localMarsMap->local_map_pose*prev_scene_pose*new_scene_pose.translation()).transpose() << " diff: " << (m_localMarsMap->local_map_pose*prev_scene_pose*last_kf_pose.translation()-m_localMarsMap->local_map_pose*prev_scene_pose*new_scene_pose.translation()).transpose() << " e: " << (m_localMarsMap->local_map_pose*prev_scene_pose*last_kf_pose.translation()-m_localMarsMap->local_map_pose*prev_scene_pose*new_scene_pose.translation()).norm();
+            LOG(1) << "last_kf_t: " << last_kf_pose.translation().transpose() << " new_scene_t: "<<  new_scene_pose.translation().transpose();
+            //LOG(1) << "last_kf_t: " << (m_localMarsMap->local_map_pose*prev_scene_pose*last_kf_pose.translation()).transpose() << " new_scene_t: "<<  (m_localMarsMap->local_map_pose*prev_scene_pose*new_scene_pose.translation()).transpose() << " diff: " << (m_localMarsMap->local_map_pose*prev_scene_pose*last_kf_pose.translation()-m_localMarsMap->local_map_pose*prev_scene_pose*new_scene_pose.translation()).transpose() << " e: " << (m_localMarsMap->local_map_pose*prev_scene_pose*last_kf_pose.translation()-m_localMarsMap->local_map_pose*prev_scene_pose*new_scene_pose.translation()).norm();
 
             Eigen::Matrix6d covar = Eigen::Matrix6d::Zero();
             m_marsRegistrator->getCovariance( 0, new_scene_pose, covar );
@@ -950,7 +953,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             if ( m_localMarsMap->local_map_moved )
             {
                 asOneCenteredLocalMap = m_localMarsMap->getAsOneCenteredMap();
-                LOG(INFO) << "local map moved... pose: " << m_localMarsMap->local_map_last_moving_pose.params().transpose() << "\nnew_scene: " << new_scene_pose.params().transpose() << "\ninterp_pose: " << interp_pose.params().transpose();
+                LOG(1) << "local map moved... pose: " << m_localMarsMap->local_map_last_moving_pose.params().transpose() << "\nnew_scene: " << new_scene_pose.params().transpose() << "\ninterp_pose: " << interp_pose.params().transpose();
 
                 const Sophus::SE3d move_pose = m_localMarsMap->local_map_last_moving_pose.inverse();
                 m_interpolated_scene_pose = move_pose * m_interpolated_scene_pose;
@@ -1126,7 +1129,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             nc.reserveSurfelTriangleEllipsoid(scene_cells.size());
             if ( showSemanticColored )
                 s.reserveSurfelTriangleEllipsoid(scene_cells.size());
-            LOG(INFO) << "ShowMarsSurfels: " << scene_cells.size() << " pts: " << asOneCenteredLocalMap->m_num_points << " p:" << pose.params().transpose();
+            LOG(1) << "ShowMarsSurfels: " << scene_cells.size() << " pts: " << asOneCenteredLocalMap->m_num_points << " p:" << pose.params().transpose();
             for ( const SurfelInfoConstPtr & cell : scene_cells )
             {
                 if ( cell == nullptr || !cell->m_surfel ) continue;
@@ -1138,7 +1141,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 //f.addNormal( (cell->m_center_s + cell->m_surfel->mean_), cell->m_surfel->first_view_dir_, rc);
                 //if ( (cell->m_surfel->eigen_values_.array().sqrt().maxCoeff()*3) > 5 )
                 //{
-                //    LOG(INFO) << "Upsi Daisy: ct: "<< cell->m_center_s.transpose() << " m: " << cell->m_surfel->mean_.transpose()<< " cov=[" << cell->m_surfel->cov_.row(0) << "; "<< cell->m_surfel->cov_.row(1) << "; " << cell->m_surfel->cov_.row(2)<<"] ";
+                //    LOG(1) << "Upsi Daisy: ct: "<< cell->m_center_s.transpose() << " m: " << cell->m_surfel->mean_.transpose()<< " cov=[" << cell->m_surfel->cov_.row(0) << "; "<< cell->m_surfel->cov_.row(1) << "; " << cell->m_surfel->cov_.row(2)<<"] ";
                 //}
                 if ( ! semantics_only )
                 {
@@ -1259,7 +1262,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                     //sm->showPointMesh("sceneSemantics"+std::to_string(cloud_idx+1),true);
                 }
 
-                LOG(INFO) << "SceneCloud["<<cloud_idx<<"] has " << scene_cloud->size();
+                LOG(1) << "SceneCloud["<<cloud_idx<<"] has " << scene_cloud->size();
                 if ( int(cloud_idx)+1 <= curTimes.rows() )
                 {
                     constexpr uint64_t num_samples = 10;
@@ -1402,7 +1405,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 //e.showPointMesh("sceneSurfelNotValidMean_"+std::to_string(idx), true, interp_scene_pose);
                 //p.showPointMesh("sceneSurfelTooLittlePoints_"+std::to_string(idx), true, interp_scene_pose);
             }
-            LOG(INFO) << "\n\ntotal_scene_surfel_show: " << total.getTime();
+            LOG(1) << "\n\ntotal_scene_surfel_show: " << total.getTime();
         }
 #endif
 
@@ -1438,7 +1441,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
 //                    {
 //                        levelV[cell.m_level].addSurfelTriangleEllipsoid( Eigen::Matrix3d::Identity(), Eigen::Vector3f::Constant(0.01*(4-cell.m_level)), cell.m_center_s, VisMesh::red,last_scene->m_map_params.getCellSizeOnLevel(cell.m_level)/2);
 //                        //if ( cell.m_center_s.norm() < 10 )
-//                        LOG(INFO) << "lvl: " << cell.m_level << " c: " << cell.m_center_s.transpose() << " #pt: " << cell.m_surfel->getNumPoints() << " valid: " << cell.m_surfel->valid_ << " det: "  << cell.m_surfel->cov_.determinant() << " cov=[" << cell.m_surfel->cov_.row(0) << "; " << cell.m_surfel->cov_.row(1) << "; " << cell.m_surfel->cov_.row(2)<<"] ev: " << Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f>(cell.m_surfel->cov_).eigenvalues().transpose()<< " s: " << (Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f>(cell.m_surfel->cov_).eigenvalues().array()<= std::numeric_limits<float>::epsilon()).transpose();
+//                        LOG(1) << "lvl: " << cell.m_level << " c: " << cell.m_center_s.transpose() << " #pt: " << cell.m_surfel->getNumPoints() << " valid: " << cell.m_surfel->valid_ << " det: "  << cell.m_surfel->cov_.determinant() << " cov=[" << cell.m_surfel->cov_.row(0) << "; " << cell.m_surfel->cov_.row(1) << "; " << cell.m_surfel->cov_.row(2)<<"] ev: " << Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f>(cell.m_surfel->cov_).eigenvalues().transpose()<< " s: " << (Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f>(cell.m_surfel->cov_).eigenvalues().array()<= std::numeric_limits<float>::epsilon()).transpose();
 //                    }
                     continue;
                 }
@@ -1481,7 +1484,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 levelOV[idx].showSurfelMesh("osdSceneL"+std::to_string(idx), true, m_localMarsMap->local_map_pose * new_scene_pose,m_surfel_type);
                 levelOC[idx].showSurfelMesh("osdSceneL"+std::to_string(idx), true, m_localMarsMap->local_map_pose * new_scene_pose,m_surfel_type);
             }
-            LOG(INFO) << "Normal: " << scene_cells.size() << " Adapted: " << ov.size();
+            LOG(1) << "Normal: " << scene_cells.size() << " Adapted: " << ov.size();
 
             std::vector<MarsMap *> sceneMapPtrVec = m_sceneMarsMap->getTransformedMapPtrVec(prev_scene_pose);
             for ( size_t idx = 0; idx < sceneMapPtrVec.size(); ++idx)

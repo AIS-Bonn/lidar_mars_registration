@@ -43,7 +43,7 @@ SparseVoxelGrid::SparseVoxelGrid( const MapParameters & params )
     : m_map_params ( params ), m_maps ( params.m_num_levels ), m_maps_surfel_info ( params.m_num_levels )
 {
     const Eigen::VectorXd d = getDistancesBetweenVertices();
-    LOG(INFO) << "dist between vertices: " << d.transpose();
+    LOG(1) << "dist between vertices: " << d.transpose();
 }
 
 
@@ -127,7 +127,7 @@ int SparseVoxelGrid::update( const SurfelInfoVector & surfels )
         num_points += surfel.m_surfel->getNumPoints();
         num_classes += surfel.m_class != nullptr;
     }
-    LOG(INFO) << "update of Grid - num_clases: " << num_classes;
+    LOG(1) << "update of Grid - num_clases: " << num_classes;
     return num_points;
 }
 
@@ -371,7 +371,7 @@ void SparseVoxelGrid::getCellsAdaptive( SurfelInfoVector & surfels, int & normal
     std::vector<int> surfelsPerLevel(m_maps.size(),0);
     for ( const auto & s : surfels )
         ++surfelsPerLevel[s.m_level];
-    LOG(INFO) << "Adaptive: per lvl: " << Eigen::Map<Eigen::VectorXi>(surfelsPerLevel.data(),surfelsPerLevel.size(), 1).transpose() << " prCoarser: " << prevUseCoarserLevel.size() << " notCL1: " << notInCenterL1;
+    LOG(1) << "Adaptive: per lvl: " << Eigen::Map<Eigen::VectorXi>(surfelsPerLevel.data(),surfelsPerLevel.size(), 1).transpose() << " prCoarser: " << prevUseCoarserLevel.size() << " notCL1: " << notInCenterL1;
 }
 
 void SparseVoxelGrid::getCellsOnLevel ( const IndexType & lvlIdx, SurfelInfoVector & surfels, const bool & omit_center ) const
@@ -450,7 +450,7 @@ int SparseVoxelGrid::addCells ( const std::vector<SurfelInfoT> & surfels, const 
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose(); // << " cp: " << cp;
+    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose(); // << " cp: " << cp;
     return num_points;
 }
 
@@ -549,7 +549,7 @@ int SparseVoxelGrid::addCellsOnGrid ( const std::vector<SurfelInfoT> & surfels, 
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
+    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
     return num_points;
 }
 
@@ -622,7 +622,7 @@ int SparseVoxelGrid::addCloud ( MarsMapPointCloud::Ptr cloud, const Sophus::SE3d
             }
         }
     }
-    //LOG(INFO) << "num_points: " << num_points << " updatedCells: " << updated << " numClasses: " << num_classes;
+    //LOG(1) << "num_points: " << num_points << " updatedCells: " << updated << " numClasses: " << num_classes;
     Eigen::VectorXi cellsFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
     Eigen::VectorXi cellsMaxFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
     for ( size_t lvlIdx = 0; lvlIdx < m_maps.size(); ++lvlIdx )
@@ -630,7 +630,7 @@ int SparseVoxelGrid::addCloud ( MarsMapPointCloud::Ptr cloud, const Sophus::SE3d
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " updatedCells: " << updated << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
+    LOG(1) << "num_points: " << num_points << " updatedCells: " << updated << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
     return num_points;
 }
 
@@ -639,8 +639,8 @@ bool SparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const LevelI
 {
     ZoneScopedN("SparseVoxelGrid::getSensorCell");
     cellPtrs.clear();
-    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_maps.size()) ) { LOG(INFO) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; return false; } // check lvl bounds
-    if ( ! m_map_params.isInBounds ( pt_s , search_lvl ) ) {  LOG(INFO) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; return false; }
+    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_maps.size()) ) { LOG(1) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; return false; } // check lvl bounds
+    if ( ! m_map_params.isInBounds ( pt_s , search_lvl ) ) {  LOG(1) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; return false; }
 
     cellPtrs.reserve(27);
 

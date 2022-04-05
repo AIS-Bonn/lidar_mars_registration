@@ -111,7 +111,7 @@ static void compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & t
         const Eigen::Quaterniond & diffOrientation_lidar = diffOri[closestIdx];
         cloud->V.row(idx) = ( diffOrientation_lidar * cloud->V.row(idx).transpose()).transpose();
     }
-    LOG(INFO) << "firstOri: "<< firstOrientation.coeffs().transpose() << " lastDiffOriL: " << diffOrientation_lidar.coeffs().transpose() << " q_li: " << q_lidar_imu.coeffs().transpose() << " #i: " << imu_msgs.size() << " dt: " << dt << " dp: " << dp << " +t: " << max_time << " -t: " << min_time << " lp: " << lastPos << " fp: " << firstPos;
+    LOG(1) << "firstOri: "<< firstOrientation.coeffs().transpose() << " lastDiffOriL: " << diffOrientation_lidar.coeffs().transpose() << " q_li: " << q_lidar_imu.coeffs().transpose() << " #i: " << imu_msgs.size() << " dt: " << dt << " dp: " << dp << " +t: " << max_time << " -t: " << min_time << " lp: " << lastPos << " fp: " << firstPos;
 }
 #endif
 
