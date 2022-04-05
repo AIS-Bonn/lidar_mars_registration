@@ -427,7 +427,7 @@ void PermutohedralLattice<P>::getCellsAdaptive ( SurfelInfoVector & surfels, int
     std::vector<int> surfelsPerLevel(m_maps.size(),0);
     for ( const auto & s : surfels )
         ++surfelsPerLevel[s.m_level];
-    LOG(INFO) << "Adaptive: per lvl: " << Eigen::Map<Eigen::VectorXi>(surfelsPerLevel.data(),surfelsPerLevel.size(), 1).transpose() << " prCoarser: " << prevUseCoarserLevel.size() << " notCL1: " << notInCenterL1;
+    LOG(1) << "Adaptive: per lvl: " << Eigen::Map<Eigen::VectorXi>(surfelsPerLevel.data(),surfelsPerLevel.size(), 1).transpose() << " prCoarser: " << prevUseCoarserLevel.size() << " notCL1: " << notInCenterL1;
 }
 
 template <int P>
@@ -572,7 +572,7 @@ int PermutohedralLattice<P>::addCells ( const std::vector<SurfelInfoT> & surfels
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose(); // << " cp: " << cp;
+    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose(); // << " cp: " << cp;
     return num_points;
 }
 
@@ -776,7 +776,7 @@ int PermutohedralLattice<P>::addCellsOnGrid ( const std::vector<SurfelInfoT> & s
         cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
         cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
     }
-    LOG(INFO) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
+    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
     return num_points;
 }
 
@@ -907,7 +907,7 @@ int PermutohedralLattice<P>::addCloud(MarsMapPointCloud::Ptr cloud, const Sophus
             }
         }
     }
-    LOG(INFO) << "num_points: " << num_points << " ( " << num_pts << " ) updatedCells: " << updated;
+    LOG(1) << "num_points: " << num_points << " ( " << num_pts << " ) updatedCells: " << updated;
     return num_points;
 }
 
@@ -918,8 +918,8 @@ bool PermutohedralLattice<P>::getSensorCell ( const Eigen::Vector3f & pt_s, cons
     cellPtrs.clear();
     if ( neighbors > 1 ) LOG(FATAL) << "Currently not supported for higher hop neigbors.";
 
-    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_maps.size()) ) { LOG(INFO) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; return false; } // check lvl bounds
-    if ( ! m_map_params.isInBounds ( pt_s , search_lvl ) ) {  LOG(INFO) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; return false; }
+    if ( search_lvl < 0 || search_lvl >= LevelIndexType(m_maps.size()) ) { LOG(1) << "ooL? " << pt_s.transpose() << " lvl: " << search_lvl; return false; } // check lvl bounds
+    if ( ! m_map_params.isInBounds ( pt_s , search_lvl ) ) {  LOG(1) << "oob: " << pt_s.transpose() << " lvl: " << search_lvl; return false; }
     cellPtrs.reserve(9);
 
     // find the corresponding simplex:
