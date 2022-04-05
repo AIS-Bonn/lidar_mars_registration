@@ -1,6 +1,7 @@
 #pragma once
 
 #include <geometry_msgs/Transform.h>
+#include <geometry_msgs/TransformStamped.h>
 #include "sophus/se3.hpp"
 
 //#include <tf/LinearMath/Transform.h>
