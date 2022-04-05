@@ -160,6 +160,7 @@ private:
     bool m_send_map_baselink_tf = false;
 
     bool m_compensate_orientation = false;
+    bool m_use_gyro_directly = false;
     bool m_organized_scans = true;
     double m_fov_up = 45;
     double m_fov_down = -45;

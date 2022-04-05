@@ -141,6 +141,7 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
     m_num_scans_per_second = dyn_config["num_scans_per_second"];
 
     m_compensate_orientation = dyn_config["compensate_orientation"];
+    m_use_gyro_directly = dyn_config["use_gyro_directly"];
     m_organized_scans = dyn_config["organized_scans"];
     m_fov_up = dyn_config["fov_up"];
     m_fov_down = dyn_config["fov_down"];
@@ -628,7 +629,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
         std::vector<sensor_msgs::Imu> imu_msgs_vec; imu_msgs_vec.reserve(imu_msgs->size());
         for ( const auto & msg : *imu_msgs)
             imu_msgs_vec.emplace_back(msg.second);
-        compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), imu_msgs_vec, m_cur_pose_baselink_sensor.so3().unit_quaternion(), m_min_range );
+        compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), imu_msgs_vec, m_cur_pose_baselink_sensor.so3().unit_quaternion(), m_min_range, m_use_gyro_directly );
     }
     }
 

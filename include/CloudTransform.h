@@ -94,7 +94,6 @@ static void compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & t
         diffOri[idx-firstPos] = diffOrientation_lidar;
     }
 
-
     Eigen::Quaterniond diffOrientation_lidar;
     int prevClosestIdx = -1;
     const int num_pts = cloud->V.rows();
@@ -115,7 +114,7 @@ static void compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & t
 }
 #endif
 
-static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::VectorXi & times, const int64_t & cur_time, const int64_t & last_time, const std::vector<sensor_msgs::Imu> & imu_msgs, const Eigen::Quaterniond & q_lidar_imu, const double & min_range = 0.1 )
+static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::VectorXi & times, const int64_t & cur_time, const int64_t & last_time, const std::vector<sensor_msgs::Imu> & imu_msgs, const Eigen::Quaterniond & q_lidar_imu, const double & min_range = 0.1, const bool & use_gyro_directly = false )
 {
     if ( last_time == 0 ) return;
     if ( imu_msgs.empty() ) return;
@@ -147,12 +146,31 @@ static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::Ve
     const Eigen::Quaterniond firstOrientation_lidar_imu = (q_lidar_imu*firstOrientation.inverse()).normalized();
 
     std::vector<Eigen::Quaternionf> diffOri(lastPos-firstPos+1,Eigen::Quaternionf::Identity());
-    for ( size_t idx = firstPos; idx <= lastPos; ++idx)
+    if ( use_gyro_directly )
     {
-        const Eigen::Quaterniond cur_ori = Eigen::Quaterniond(imu_msgs[idx].orientation.w,imu_msgs[idx].orientation.x,imu_msgs[idx].orientation.y,imu_msgs[idx].orientation.z).normalized();
-        const Eigen::Quaterniond curOrientation_imu_lidar = (cur_ori * q_lidar_imu.inverse()).normalized();
-        const Eigen::Quaterniond diffOrientation_lidar = (firstOrientation_lidar_imu * curOrientation_imu_lidar).normalized();
-        diffOri[idx-firstPos] = diffOrientation_lidar.cast<float>();
+        Sophus::SO3d prev_estim;
+        int64_t prev_dt_ns = imu_msgs[firstPos].header.stamp.toNSec();
+        for ( size_t idx = firstPos; idx <= lastPos; ++idx)
+        {
+            const int64_t cur_dt_ns = imu_msgs[idx].header.stamp.toNSec();
+            const Sophus::SO3d cur_estim = prev_estim * Sophus::SO3d::exp( TimeConversion::to_s(cur_dt_ns - prev_dt_ns) * Eigen::Vector3d(imu_msgs[idx].angular_velocity.x, imu_msgs[idx].angular_velocity.y,imu_msgs[idx].angular_velocity.z));
+            const Eigen::Quaterniond cur_ori = cur_estim.unit_quaternion();
+            const Eigen::Quaterniond curOrientation_imu_lidar = (cur_ori * q_lidar_imu.inverse()).normalized();
+            const Eigen::Quaterniond diffOrientation_lidar = (firstOrientation_lidar_imu * curOrientation_imu_lidar).normalized();
+            diffOri[idx-firstPos] = diffOrientation_lidar.cast<float>();
+            prev_estim = cur_estim;
+            prev_dt_ns = cur_dt_ns;
+        }
+    }
+    else
+    {
+        for ( size_t idx = firstPos; idx <= lastPos; ++idx)
+        {
+            const Eigen::Quaterniond cur_ori = Eigen::Quaterniond(imu_msgs[idx].orientation.w,imu_msgs[idx].orientation.x,imu_msgs[idx].orientation.y,imu_msgs[idx].orientation.z).normalized();
+            const Eigen::Quaterniond curOrientation_imu_lidar = (cur_ori * q_lidar_imu.inverse()).normalized(); // q_world_imu * q_imu_lidar = q_world_lidar
+            const Eigen::Quaterniond diffOrientation_lidar = (firstOrientation_lidar_imu * curOrientation_imu_lidar).normalized(); // q_lidar0_world * q_world_lidar = q_lidar0_lidar
+            diffOri[idx-firstPos] = diffOrientation_lidar.cast<float>();
+        }
     }
 
 #ifdef USE_OMP
