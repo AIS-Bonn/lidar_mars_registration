@@ -97,7 +97,7 @@ public:
     int get_current_index() const;
     int get_total_num() const;
 
-    Eigen::Quaterniond get_lidar_imu_orientation() const { return m_q_lidar_imu; }
+    Sophus::SO3d get_lidar_imu_orientation() const { return m_pose_lidar_imu.so3(); }
 
     Sophus::SE3d get_pose_lidar_imu() const { return m_pose_lidar_imu; }
 
@@ -117,7 +117,6 @@ private:
     std::vector<geometry_msgs::TransformStamped> m_poses;
     std::vector<sensor_msgs::Imu> m_imu_msgs;
     std::vector<nav_msgs::Odometry> m_gps_msgs;
-    Eigen::Quaterniond m_q_lidar_imu = Eigen::Quaterniond::Identity();
     Sophus::SE3d m_pose_lidar_imu;
 
     CloudPtr m_mav_mesh;

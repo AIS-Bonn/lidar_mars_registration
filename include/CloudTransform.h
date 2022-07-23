@@ -55,140 +55,310 @@ typedef easy_pbr::MeshSharedPtr MeshCloudPtr;
 #define LOGURU_REPLACE_GLOG 1
 #include "loguru.hpp"
 
+inline bool is_imu_ori_valid ( const sensor_msgs::Imu & msg )
+{
+    return ! ((std::abs<double>(msg.orientation_covariance[0]-(-1)) < 1e-12) || Eigen::Quaterniond(msg.orientation.w,msg.orientation.x,msg.orientation.y,msg.orientation.z).squaredNorm() < 1e-4);
+}
+inline Sophus::SO3d ori_from_imu_msg ( const sensor_msgs::Imu & msg )
+{
+    return Sophus::SO3d ( Eigen::Quaterniond(msg.orientation.w,msg.orientation.x,msg.orientation.y,msg.orientation.z).normalized() );
+}
+inline Eigen::Vector3d get_gyr_from_msg ( const sensor_msgs::Imu & msg )
+{
+    return {msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z}; // already in FLU
+}
+
 #ifdef USE_EASY_PBR
 #include "easy_pbr/Scene.h"
-static void compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & times, const int64_t & cur_time, const int64_t & last_time, const std::vector<sensor_msgs::Imu> & imu_msgs, const Eigen::Quaterniond & q_lidar_imu )
+
+static void compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
 {
-    if ( last_time == 0 ) return;
-    if ( imu_msgs.empty() ) return;
+    //constexpr bool print_info = false;
+    if ( last_scan_ns == 0 ) return;
+    if ( imu_msgs.size() < 2 ) return;
+    //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation");
+    //StopWatch watch;
+    int64_t first_imu_ns = imu_msgs.cbegin()->first;
+    int64_t last_imu_ns = imu_msgs.crbegin()->first;
 
-    size_t firstPos = 0, lastPos = 0;
-    for ( size_t idx = 0; idx < imu_msgs.size(); ++idx)
+    for ( const std::pair<const int64_t, sensor_msgs::Imu> & it : imu_msgs )
     {
-        const int64_t imu_msg_ts = int64_t(imu_msgs[idx].header.stamp.toNSec());
-        if ( imu_msg_ts < last_time )
-            firstPos = idx;
-        if ( imu_msg_ts < cur_time )
-            lastPos = idx;
+        const int64_t & imu_msg_ts = it.first;
+        if ( imu_msg_ts < last_scan_ns )
+            first_imu_ns = imu_msg_ts;
+        if ( imu_msg_ts < cur_scan_ns )
+            last_imu_ns = imu_msg_ts;
     }
-    int32_t max_time = std::numeric_limits<int32_t>::min();
-    int32_t min_time = std::numeric_limits<int32_t>::max();
-    for ( int idx = 0; idx < times.rows(); ++idx )
-    {
-        if ( times(idx) > max_time ) max_time = times(idx);
-        if ( times(idx) < min_time && cloud->D(idx) > 0.1 ) min_time = times(idx);
-    }
+    const int64_t ref_imu_ns = last_imu_ns; // since cur_scan_ns is at the end of the scan.
+    const bool firstOneIsOlder = first_imu_ns < last_scan_ns;
+    // if first msg is older than last time: it should only be used partially.
+    // TODO: handle this correctly!
 
-    const double dt = max_time - min_time; // difference in nano sec
-    const double dp = lastPos - firstPos;
+    const Eigen::VectorXi & pt_times_ns = times;
 
-    const Eigen::Quaterniond firstOrientation = Eigen::Quaterniond(imu_msgs[firstPos].orientation.w,imu_msgs[firstPos].orientation.x,imu_msgs[firstPos].orientation.y,imu_msgs[firstPos].orientation.z).normalized();
-    const Eigen::Quaterniond firstOrientation_lidar_imu = (q_lidar_imu*firstOrientation.inverse()).normalized();
-
-    std::vector<Eigen::Quaterniond> diffOri(lastPos-firstPos+1,Eigen::Quaterniond::Identity());
-    for ( size_t idx = firstPos; idx <= lastPos; ++idx)
-    {
-        const Eigen::Quaterniond cur_ori = Eigen::Quaterniond(imu_msgs[idx].orientation.w,imu_msgs[idx].orientation.x,imu_msgs[idx].orientation.y,imu_msgs[idx].orientation.z).normalized();
-        const Eigen::Quaterniond curOrientation_imu_lidar = (cur_ori * q_lidar_imu.inverse()).normalized();
-        const Eigen::Quaterniond diffOrientation_lidar = (firstOrientation_lidar_imu * curOrientation_imu_lidar).normalized();
-        diffOri[idx-firstPos] = diffOrientation_lidar;
-    }
-
-    Eigen::Quaterniond diffOrientation_lidar;
-    int prevClosestIdx = -1;
     const int num_pts = cloud->V.rows();
-#ifdef USE_OMP
-    #pragma omp parallel for
-#endif
+    const int num_times = pt_times_ns.rows();
+    const bool t_cont = (pt_times_ns.head(num_pts-1).array() <= pt_times_ns.segment(1,num_pts-1).array()).all();
+    const int min_time_ns = pt_times_ns.head(num_pts).minCoeff();
+    const int max_time_ns = pt_times_ns.head(num_pts).maxCoeff();
+
+    bool use_gyro_directly = should_use_gyro_directly;
+    if ( !should_use_gyro_directly && !is_imu_ori_valid(imu_msgs.find(ref_imu_ns)->second) )
+    {
+        //LOG(WARNING) << "Reference orientation is invalid, but I should not use gyro directly? I still have to!";
+        use_gyro_directly = true;
+    }
+    std::map<int64_t,std::pair<Sophus::SO3d, Eigen::Vector3d>> oris;
+
+    const auto bit = imu_msgs.find(first_imu_ns);
+    const auto lit = imu_msgs.find(last_imu_ns);
+    if ( bit == imu_msgs.end() || lit == imu_msgs.end() )
+    {
+        //LOG(WARNING) << "could not find iterators. t1: " << first_imu_ns << " tn: " << last_imu_ns;
+        return;
+    }
+    const auto nit = std::next(lit);
+    {
+        //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation::compute_log");
+        Sophus::SO3d prev_estim;
+        Sophus::SO3d prev_estim_lidar;
+        int64_t prev_imu_ns = bit->first;
+        for ( auto it = bit; it != nit; ++it )
+        {
+            const int64_t & cur_imu_ns = it->first;
+            const sensor_msgs::Imu & msg = it->second;
+            Sophus::SO3d cur_estim;
+            if ( use_gyro_directly )
+                cur_estim = prev_estim * Sophus::SO3d::exp( TimeConversion::to_s(cur_imu_ns - prev_imu_ns) * get_gyr_from_msg ( msg ));
+            else
+                cur_estim = ori_from_imu_msg ( msg );
+            const Sophus::SO3d cur_estim_lidar = cur_estim * q_lidar_imu.inverse();
+            const Eigen::Vector3d log_vec = (prev_estim_lidar.inverse()*cur_estim_lidar).log();
+            oris[cur_imu_ns] = {cur_estim_lidar,log_vec};
+            prev_estim_lidar = cur_estim_lidar;
+            prev_estim = cur_estim;
+            prev_imu_ns = cur_imu_ns;
+        }
+    }
+
+    const Sophus::SO3d ref_ori_lidar = oris.crbegin()->second.first.inverse(); // q_lidar_imu * q_imu0_world = q_lidar0_world
+    for ( std::pair<const int64_t, std::pair<Sophus::SO3d,Eigen::Vector3d>> & it : oris )
+    {
+        it.second.first = ref_ori_lidar * it.second.first; // premultiply ref_ori to get relative to last one.
+    }
+    auto it_cont = oris.cbegin();
+
+    const int64_t offset = stamp_at_beginning ? 0 : -max_time_ns;  // max_time_ns is at cloud_stamp => go to first time.
+
+    Sophus::SO3d diff_ori_lidar;
+    //int num_slerped = 0;
+    int prev_pt_ns = std::numeric_limits<int>::lowest(); // force computation, since times_ns[i] >= 0
+    const int64_t first_scan_pt_ns = cur_scan_ns + offset;
+    //{
+    //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation::points");
     for ( int idx = 0; idx < num_pts; ++idx )
     {
-        if ( cloud->D(idx) < 0.1 ) continue;
+        if ( cloud->V.row(idx).squaredNorm() < min_range2 ) continue;
+        if ( prev_pt_ns != pt_times_ns(idx) )
+        {
+            prev_pt_ns = pt_times_ns(idx);
+            const int64_t cur_pt_ns = first_scan_pt_ns + pt_times_ns(idx);
 
-        const double ct = times(idx) - min_time;
-        const double ctdt = ct / dt; // in [0,1]
-        const int closestIdx = std::max<size_t>(firstPos,std::min<size_t>(std::round<size_t>(dp * ctdt)+firstPos, lastPos))-firstPos;
-        const Eigen::Quaterniond & diffOrientation_lidar = diffOri[closestIdx];
-        cloud->V.row(idx) = ( diffOrientation_lidar * cloud->V.row(idx).transpose()).transpose();
+            auto it_next = it_cont;
+            if ( t_cont )
+            {
+                if ( (it_next != oris.cend()) && (it_next->first <= cur_pt_ns) )
+                {
+                    it_next = std::next(it_next);
+                    it_cont = it_next;
     }
-    LOG(1) << "firstOri: "<< firstOrientation.coeffs().transpose() << " lastDiffOriL: " << diffOrientation_lidar.coeffs().transpose() << " q_li: " << q_lidar_imu.coeffs().transpose() << " #i: " << imu_msgs.size() << " dt: " << dt << " dp: " << dp << " +t: " << max_time << " -t: " << min_time << " lp: " << lastPos << " fp: " << firstPos;
+            }
+            else
+            {
+                it_next = oris.upper_bound(cur_pt_ns); // => greater than
+            }
+
+            if ( it_next == oris.cend() ) // none larger: get last one, we will cap time
+            {
+                diff_ori_lidar = Sophus::SO3d();
+            }
+            else
+            {
+                if ( it_next == oris.cbegin() ) // first one is larger:
+                {
+                    diff_ori_lidar = oris.cbegin()->second.first;// due to time cap, we use first
+                }
+                else
+                {
+                    // somewhere inbetween
+                    const auto it_prev = std::prev(it_next);
+                    const int64_t next_imu_ns = it_next->first;
+                    const int64_t prev_imu_ns = it_prev->first;
+                    //LOG(INFO) << "idx: " << idx << " oi: " << prevOriIdx << " i: " << imu_msgs.size() << " s: " << oris.size() << " dt: " << dt<< " t: " << cur_t_ns << " o: " << oris[prevOriIdx].first << " n: " << oris[prevOriIdx+1].first << " t-o: " << (cur_t_ns - oris[prevOriIdx].first) << " n-t: " << ( oris[prevOriIdx+1].first - cur_t_ns);
+                    if( cur_pt_ns == prev_imu_ns ) // no need to check for next_imu_ns, due to upper_bound
+                        diff_ori_lidar = it_prev->second.first;
+                    else {
+                        //SLERP
+                        const int64_t cur_dt_ns = cur_pt_ns - prev_imu_ns;
+                        const int64_t imu_dt_ns = next_imu_ns - prev_imu_ns;
+                        const float dt = std::min(1.f, std::max( 0.f, float(TimeConversion::to_s( float(cur_dt_ns) / float(imu_dt_ns)))));
+                        diff_ori_lidar = (it_prev->second.first * Sophus::SO3d::exp( dt * it_prev->second.second ));
+                        //++num_slerped;
+                    }
+                }
+            }
+        }
+        cloud->V.row(idx) = (diff_ori_lidar.unit_quaternion() * cloud->V.row(idx).transpose()).transpose();
+    }
+    //}
+    //if constexpr ( print_info )
+    //LOG(1) << "orientation comp took: " << watch.getTime() << " i: " << imu_msgs.size() << " o: " << oris.size() << " s: " << num_slerped;
 }
 #endif
 
-static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::VectorXi & times, const int64_t & cur_time, const int64_t & last_time, const std::vector<sensor_msgs::Imu> & imu_msgs, const Eigen::Quaterniond & q_lidar_imu, const double & min_range = 0.1, const bool & use_gyro_directly = false )
+static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
 {
-    if ( last_time == 0 ) return;
-    if ( imu_msgs.empty() ) return;
+    //constexpr bool print_info = false;
+    if ( last_scan_ns == 0 ) return;
+    if ( imu_msgs.size() < 2 ) return;
+    //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation");
+    //StopWatch watch;
+    int64_t first_imu_ns = imu_msgs.cbegin()->first;
+    int64_t last_imu_ns = imu_msgs.crbegin()->first;
 
-    size_t firstPos = 0, lastPos = 0;
-    for ( size_t idx = 0; idx < imu_msgs.size(); ++idx)
+    for ( const std::pair<const int64_t, sensor_msgs::Imu> & it : imu_msgs )
     {
-        const int64_t imu_msg_ts = int64_t(imu_msgs[idx].header.stamp.toNSec());
-        if ( imu_msg_ts < last_time )
-            firstPos = idx;
-        if ( imu_msg_ts < cur_time )
-            lastPos = idx;
+        const int64_t & imu_msg_ts = it.first;
+        if ( imu_msg_ts < last_scan_ns )
+            first_imu_ns = imu_msg_ts;
+        if ( imu_msg_ts < cur_scan_ns )
+            last_imu_ns = imu_msg_ts;
     }
-    int32_t max_time = std::numeric_limits<int32_t>::min();
-    int32_t min_time = std::numeric_limits<int32_t>::max();
+    const int64_t ref_imu_ns = last_imu_ns; // since cur_scan_ns is at the end of the scan.
+    const bool firstOneIsOlder = first_imu_ns < last_scan_ns;
+    // if first msg is older than last time: it should only be used partially.
+    // TODO: handle this correctly!
 
     Eigen::Matrix3Xf & pts = cloud->m_points;
+    const Eigen::VectorXi & pt_times_ns = times;
+
     const int num_pts = cloud->size();
-    const int num_times = times.rows();
-    for ( int idx = 0; idx < num_times && idx < num_pts; ++idx )
+    const int num_times = pt_times_ns.rows();
+    const bool t_cont = (pt_times_ns.head(num_pts-1).array() <= pt_times_ns.segment(1,num_pts-1).array()).all();
+    const int min_time_ns = pt_times_ns.head(num_pts).minCoeff();
+    const int max_time_ns = pt_times_ns.head(num_pts).maxCoeff();
+
+    bool use_gyro_directly = should_use_gyro_directly;
+    if ( !should_use_gyro_directly && !is_imu_ori_valid(imu_msgs.find(ref_imu_ns)->second) )
     {
-        if ( times(idx) > max_time ) max_time = times(idx);
-        if ( times(idx) < min_time && pts.col(idx).norm() > min_range ) min_time = times(idx);
+        //LOG(WARNING) << "Reference orientation is invalid, but I should not use gyro directly? I still have to!";
+        use_gyro_directly = true;
     }
+    std::map<int64_t,std::pair<Sophus::SO3d, Eigen::Vector3d>> oris;
 
-    const double dt = max_time - min_time; // difference in nano sec
-    const double dp = lastPos - firstPos;
-    const Eigen::Quaterniond firstOrientation = Eigen::Quaterniond(imu_msgs[firstPos].orientation.w,imu_msgs[firstPos].orientation.x,imu_msgs[firstPos].orientation.y,imu_msgs[firstPos].orientation.z).normalized();
-    const Eigen::Quaterniond firstOrientation_lidar_imu = (q_lidar_imu*firstOrientation.inverse()).normalized();
-
-    std::vector<Eigen::Quaternionf> diffOri(lastPos-firstPos+1,Eigen::Quaternionf::Identity());
-    if ( use_gyro_directly )
+    const auto bit = imu_msgs.find(first_imu_ns);
+    const auto lit = imu_msgs.find(last_imu_ns);
+    if ( bit == imu_msgs.end() || lit == imu_msgs.end() )
     {
+        //LOG(WARNING) << "could not find iterators. t1: " << first_imu_ns << " tn: " << last_imu_ns;
+        return;
+    }
+    const auto nit = std::next(lit);
+    {
+        //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation::compute_log");
         Sophus::SO3d prev_estim;
-        int64_t prev_dt_ns = imu_msgs[firstPos].header.stamp.toNSec();
-        for ( size_t idx = firstPos; idx <= lastPos; ++idx)
+        Sophus::SO3d prev_estim_lidar;
+        int64_t prev_imu_ns = bit->first;
+        for ( auto it = bit; it != nit; ++it )
         {
-            const int64_t cur_dt_ns = imu_msgs[idx].header.stamp.toNSec();
-            const Sophus::SO3d cur_estim = prev_estim * Sophus::SO3d::exp( TimeConversion::to_s(cur_dt_ns - prev_dt_ns) * Eigen::Vector3d(imu_msgs[idx].angular_velocity.x, imu_msgs[idx].angular_velocity.y,imu_msgs[idx].angular_velocity.z));
-            const Eigen::Quaterniond cur_ori = cur_estim.unit_quaternion();
-            const Eigen::Quaterniond curOrientation_imu_lidar = (cur_ori * q_lidar_imu.inverse()).normalized();
-            const Eigen::Quaterniond diffOrientation_lidar = (firstOrientation_lidar_imu * curOrientation_imu_lidar).normalized();
-            diffOri[idx-firstPos] = diffOrientation_lidar.cast<float>();
+            const int64_t & cur_imu_ns = it->first;
+            const sensor_msgs::Imu & msg = it->second;
+            Sophus::SO3d cur_estim;
+            if ( use_gyro_directly )
+                cur_estim = prev_estim * Sophus::SO3d::exp( TimeConversion::to_s(cur_imu_ns - prev_imu_ns) * get_gyr_from_msg ( msg ));
+            else
+                cur_estim = ori_from_imu_msg ( msg );
+            const Sophus::SO3d cur_estim_lidar = cur_estim * q_lidar_imu.inverse();
+            const Eigen::Vector3d log_vec = (prev_estim_lidar.inverse()*cur_estim_lidar).log();
+            oris[cur_imu_ns] = {cur_estim_lidar,log_vec};
+            prev_estim_lidar = cur_estim_lidar;
             prev_estim = cur_estim;
-            prev_dt_ns = cur_dt_ns;
-        }
-    }
-    else
-    {
-        for ( size_t idx = firstPos; idx <= lastPos; ++idx)
-        {
-            const Eigen::Quaterniond cur_ori = Eigen::Quaterniond(imu_msgs[idx].orientation.w,imu_msgs[idx].orientation.x,imu_msgs[idx].orientation.y,imu_msgs[idx].orientation.z).normalized();
-            const Eigen::Quaterniond curOrientation_imu_lidar = (cur_ori * q_lidar_imu.inverse()).normalized(); // q_world_imu * q_imu_lidar = q_world_lidar
-            const Eigen::Quaterniond diffOrientation_lidar = (firstOrientation_lidar_imu * curOrientation_imu_lidar).normalized(); // q_lidar0_world * q_world_lidar = q_lidar0_lidar
-            diffOri[idx-firstPos] = diffOrientation_lidar.cast<float>();
+            prev_imu_ns = cur_imu_ns;
         }
     }
 
-#ifdef USE_OMP
-    #pragma omp parallel for
-#endif
+    const Sophus::SO3d ref_ori_lidar = oris.crbegin()->second.first.inverse(); // q_lidar_imu * q_imu0_world = q_lidar0_world
+    for ( std::pair<const int64_t, std::pair<Sophus::SO3d,Eigen::Vector3d>> & it : oris )
+    {
+        it.second.first = ref_ori_lidar * it.second.first; // premultiply ref_ori to get relative to last one.
+        }
+    auto it_cont = oris.cbegin();
+
+    const int64_t offset = stamp_at_beginning ? 0 : -max_time_ns;  // max_time_ns is at cloud_stamp => go to first time.
+
+    Sophus::SO3f diff_ori_lidar;
+    //int num_slerped = 0;
+    int prev_pt_ns = std::numeric_limits<int>::lowest(); // force computation, since times_ns[i] >= 0
+    const int64_t first_scan_pt_ns = cur_scan_ns + offset;
+    //{
+    //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation::points");
     for ( int idx = 0; idx < num_pts; ++idx )
     {
-        if ( pts.col(idx).norm() < min_range ) continue;
+        if ( pts.col(idx).squaredNorm() < min_range2 ) continue;
+        if ( prev_pt_ns != pt_times_ns(idx) )
+        {
+            prev_pt_ns = pt_times_ns(idx);
+            const int64_t cur_pt_ns = first_scan_pt_ns + pt_times_ns(idx);
 
-        const int32_t ct = times(idx) - min_time;
-        const double ctdt = ct / dt; // in [0,1]
-        const int closestIdx = std::max<size_t>(firstPos,std::min<size_t>(std::round<size_t>(dp * ctdt)+firstPos, lastPos))-firstPos;
+            auto it_next = it_cont;
+            if ( t_cont )
+            {
+                if ( (it_next != oris.cend()) && (it_next->first <= cur_pt_ns) )
+                {
+                    it_next = std::next(it_next);
+                    it_cont = it_next;
+                }
+            }
+            else
+            {
+                it_next = oris.upper_bound(cur_pt_ns); // => greater than
+            }
 
-        if ( closestIdx < 0 || closestIdx >= diffOri.size() ) LOG(FATAL) << "ci: " << closestIdx << " firstPos: " << firstPos << " lastPos: " << lastPos << " do: " << diffOri.size();
-
-        const Eigen::Quaternionf & diffOrientation_lidar = diffOri[closestIdx];
-        pts.col(idx) = diffOrientation_lidar * pts.col(idx);
+            if ( it_next == oris.cend() ) // none larger: get last one, we will cap time
+            {
+                diff_ori_lidar = Sophus::SO3f();
     }
+            else
+            {
+                if ( it_next == oris.cbegin() ) // first one is larger:
+                {
+                    diff_ori_lidar = oris.cbegin()->second.first.template cast<float>();// due to time cap, we use first
+                }
+                else
+                {
+                    // somewhere inbetween
+                    const auto it_prev = std::prev(it_next);
+                    const int64_t next_imu_ns = it_next->first;
+                    const int64_t prev_imu_ns = it_prev->first;
+                    //LOG(INFO) << "idx: " << idx << " oi: " << prevOriIdx << " i: " << imu_msgs.size() << " s: " << oris.size() << " dt: " << dt<< " t: " << cur_t_ns << " o: " << oris[prevOriIdx].first << " n: " << oris[prevOriIdx+1].first << " t-o: " << (cur_t_ns - oris[prevOriIdx].first) << " n-t: " << ( oris[prevOriIdx+1].first - cur_t_ns);
+                    if( cur_pt_ns == prev_imu_ns ) // no need to check for next_imu_ns, due to upper_bound
+                        diff_ori_lidar = it_prev->second.first.template cast<float>();
+                    else {
+                        //SLERP
+                        const int64_t cur_dt_ns = cur_pt_ns - prev_imu_ns;
+                        const int64_t imu_dt_ns = next_imu_ns - prev_imu_ns;
+                        const float dt = std::min(1.f, std::max( 0.f, float(TimeConversion::to_s( float(cur_dt_ns) / float(imu_dt_ns)))));
+                        diff_ori_lidar = (it_prev->second.first * Sophus::SO3d::exp( dt * it_prev->second.second )).template cast<float>();
+                        //++num_slerped;
+                    }
+                }
+            }
+        }
+        pts.col(idx) = diff_ori_lidar * pts.col(idx);
+    }
+    //}
+    //if constexpr ( print_info )
+    //LOG(1) << "orientation comp took: " << watch.getTime() << " i: " << imu_msgs.size() << " o: " << oris.size() << " s: " << num_slerped;
 }
 
 #ifdef USE_EASY_PBR

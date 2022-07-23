@@ -626,10 +626,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     input_stamp = inputCloud->header.stamp;
     if ( m_compensate_orientation && imu_msgs && input_stamp > last_stamp )
     {
-        std::vector<sensor_msgs::Imu> imu_msgs_vec; imu_msgs_vec.reserve(imu_msgs->size());
-        for ( const auto & msg : *imu_msgs)
-            imu_msgs_vec.emplace_back(msg.second);
-        compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), imu_msgs_vec, m_cur_pose_baselink_sensor.so3().unit_quaternion(), m_min_range, m_use_gyro_directly );
+        compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), *imu_msgs, m_cur_pose_baselink_sensor.so3(), m_min_range*m_min_range, m_use_gyro_directly );
     }
     }
 

@@ -141,8 +141,11 @@ void MarsSplineRegistrator::init_params(const std::string & config_file){
     m_mars_scene_map_mesh = MarsMapPointCloud::create();
 
 #ifdef USE_EASY_PBR
+    if constexpr ( has_semantics_v<MarsMapPointCloud> )
+    {
     Config mngr_config = cfg["label_mngr"];
     m_label_manager = std::make_shared<easy_pbr::LabelMngr>(mngr_config);
+    }
 #endif
 
 }
@@ -182,7 +185,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
 {
     ++m_scan_id;
     m_was_keyframe = false;
-    constexpr bool semantics_only = false;
+    constexpr bool semantics_only = false && has_semantics_v<MarsMapPointCloud>;
 
     static Sophus::SE3d new_scene_origin_to_newest_local_scan = Sophus::SE3d();
     static Sophus::SE3d last_interp_pose;
@@ -1119,7 +1122,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
         const bool showMarsSurfels = m_show_mars_surfels;
         if ( showMarsSurfels ) //&& shouldCreateKeyFrame )
         {
-            constexpr bool showSemanticColored = true;
+            constexpr bool showSemanticColored = has_semantics_v<MarsMapPointCloud>;
             VisMesh v, nc, n, f, e, p,s;
             Eigen::Vector3f rc = VisMesh::getPlasma(0);// VisMesh::randColor();
             Sophus::SE3d pose;
@@ -1127,7 +1130,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             asOneCenteredLocalMap->getCells( scene_cells, pose );
             v.reserveSurfelTriangleEllipsoid(scene_cells.size());
             nc.reserveSurfelTriangleEllipsoid(scene_cells.size());
-            if ( showSemanticColored )
+            if constexpr ( showSemanticColored )
                 s.reserveSurfelTriangleEllipsoid(scene_cells.size());
             LOG(1) << "ShowMarsSurfels: " << scene_cells.size() << " pts: " << asOneCenteredLocalMap->m_num_points << " p:" << pose.params().transpose();
             for ( const SurfelInfoConstPtr & cell : scene_cells )
@@ -1143,18 +1146,19 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 //{
                 //    LOG(1) << "Upsi Daisy: ct: "<< cell->m_center_s.transpose() << " m: " << cell->m_surfel->mean_.transpose()<< " cov=[" << cell->m_surfel->cov_.row(0) << "; "<< cell->m_surfel->cov_.row(1) << "; " << cell->m_surfel->cov_.row(2)<<"] ";
                 //}
-                if ( ! semantics_only )
+                if constexpr ( ! semantics_only )
                 {
                     v.addSurfel(cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, cell->m_center_s + cell->m_surfel->mean_, rc, asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
                     nc.addSurfel(cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, cell->m_center_s + cell->m_surfel->mean_, VisMesh::colorFromNormal(cell->m_surfel->normal_.normalized()), asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
                 }
 
-                if ( showSemanticColored && cell->m_class )
+                if constexpr ( showSemanticColored )
+                    if ( cell->m_class )
                     s.addSurfel(cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, cell->m_center_s + cell->m_surfel->mean_, m_label_manager->color_for_label(cell->m_class->getArgMaxClass()).cast<float>(), asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
             }
             v.showSurfelMesh("marsSurfels", true, m_localMarsMap->local_map_pose,m_surfel_type);
             nc.showSurfelMesh("marsSurfelsN", true, m_localMarsMap->local_map_pose,m_surfel_type);
-            if ( showSemanticColored )
+            if constexpr ( showSemanticColored )
                 s.showSurfelMesh("marsSurfelsSem", true, m_localMarsMap->local_map_pose,m_surfel_type);
 
             for ( int lvl = 0; lvl < asOneCenteredLocalMap->m_map_params.m_num_levels; ++lvl)
@@ -1164,26 +1168,27 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 asOneCenteredLocalMap->getCellsOnLevel ( lvl, cells, false);
                 vl.reserveSurfelTriangleEllipsoid(cells.size());
                 vn.reserveSurfelTriangleEllipsoid(cells.size());
-                if ( showSemanticColored )
+                if constexpr ( showSemanticColored )
                     vs.reserveSurfelTriangleEllipsoid(cells.size());
                 for ( const SurfelInfo & cell : cells )
                 {
                     if ( ! cell.m_surfel ) continue;
                     if ( ! cell.m_surfel->evaluated_ ) LOG(FATAL) << "this should not have happend!";
                     if ( ! cell.m_surfel->valid_ || cell.m_surfel->getNumPoints() < 10.0 ) continue;
-                    if ( ! semantics_only )
+                    if constexpr ( ! semantics_only )
                     {
                         vl.addSurfel(cell.m_surfel->eigen_vectors_, cell.m_surfel->eigen_values_, cell.m_center_s + cell.m_surfel->mean_, rc, asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell.m_level)/2, m_surfel_type);
                         vn.addSurfel(cell.m_surfel->eigen_vectors_, cell.m_surfel->eigen_values_, cell.m_center_s + cell.m_surfel->mean_, VisMesh::colorFromNormal(cell.m_surfel->normal_.normalized()), asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell.m_level)/2, m_surfel_type);
                     }
-                    if ( showSemanticColored && cell.m_class )
+                    if constexpr ( showSemanticColored )
+                        if ( cell.m_class )
                         vs.addSurfel(cell.m_surfel->eigen_vectors_, cell.m_surfel->eigen_values_, cell.m_center_s + cell.m_surfel->mean_, m_label_manager->color_for_label(cell.m_class->getArgMaxClass()).cast<float>(), asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell.m_level)/2, m_surfel_type);
                 }
-                if ( ! semantics_only )
+                if constexpr ( ! semantics_only )
                 vl.showSurfelMesh("marsSurfels"+std::to_string(lvl), true, m_localMarsMap->local_map_pose, m_surfel_type);
-                if ( ! semantics_only )
+                if constexpr ( ! semantics_only )
                 vn.showSurfelMesh("marsSurfelsN"+std::to_string(lvl), true, m_localMarsMap->local_map_pose, m_surfel_type);
-                if ( showSemanticColored )
+                if constexpr ( showSemanticColored )
                     vs.showSurfelMesh("marsSurfelsSem"+std::to_string(lvl), true, m_localMarsMap->local_map_pose, m_surfel_type);
             }
 
@@ -1197,7 +1202,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
         const bool showSceneMap = m_show_scene_map; // && m_scan_id % 100 == 0;
         if ( showSceneMap )
         {
-            constexpr bool showCloudSemanticColored = true;
+            constexpr bool showCloudSemanticColored = has_semantics_v<MarsMapPointCloud>;
             constexpr bool showCloudHeightColored = false;
             constexpr bool showSceneViewDir = false;
             VisMesh::Ptr vm = VisMesh::create(), tm = VisMesh::create(), em = VisMesh::create();
@@ -1220,7 +1225,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 {
                     const Eigen::Vector3f pt = (interp_scene_pose * pts.col(idx).cast<double>()).template cast<float>();
                     vm->addPoint( pt,  VisMesh::getPlasma(float(cloud_idx+1)/(scene_clouds.size()+1)), intensity.rows()>0 ? &intensity(idx) : nullptr, reflectivity.rows()>0 ? &reflectivity(idx) : nullptr);
-                    if (showSceneViewDir )
+                    if constexpr (showSceneViewDir )
                     {
                         const Eigen::Vector3f view_dir = (pt - interp_scene_pose.translation().cast<float>()).normalized();
                         em->addEdge( pt, pt - view_dir * 0.1, VisMesh::colorFromNormal( view_dir ) );
@@ -1228,7 +1233,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                     //cm->addPoint( pt, scan_line.rows()>0 ? Eigen::Vector3f::Constant(scan_line(idx)/128) : Eigen::Vector3f::Zero(), intensity.rows()>0 ? &intensity(idx) : nullptr, reflectivity.rows()>0 ? &reflectivity(idx) : nullptr);
                 }
 
-                if ( showCloudHeightColored )
+                if constexpr ( showCloudHeightColored )
                 {
                     CloudPtr vmm = vm->getPointMesh();
                     vmm->worldROS2worldGL();
@@ -1241,7 +1246,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                     vm->showPointMesh("sceneCloud_"+std::to_string(cloud_idx+1), true);
 
 
-                if ( showCloudSemanticColored )
+                if constexpr ( showCloudSemanticColored )
                 {
                     VisMesh::Ptr sm = showSemanticColored<MarsMapPointCloud>( scene_cloud, interp_scene_pose );
                     CloudPtr vmm = sm->getPointMesh();
@@ -1280,7 +1285,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             }
             //vm->showPointMesh("sceneMap"+std::to_string(m_scan_id), true);
 
-            if ( showSceneViewDir ) em->showEdgeMesh("sceneViewDir", true);
+            if constexpr ( showSceneViewDir ) em->showEdgeMesh("sceneViewDir", true);
             tm->showEdgeMeshFromPoints("sceneTraj", true);
 
             VisMesh::Ptr lm = VisMesh::create();
@@ -1294,7 +1299,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             {
                 lm->addPoint( (new_scene_map_pose*pts.col(idx).cast<double>()).template cast<float>(), VisMesh::getPlasma(0), intensity.rows()>0 ? &intensity(idx) : nullptr, reflectivity.rows()>0 ? &reflectivity(idx) : nullptr);
             }
-            if ( showCloudHeightColored )
+            if constexpr ( showCloudHeightColored )
             {
                 CloudPtr vmm = lm->getPointMesh();
                 vmm->worldROS2worldGL();
@@ -1305,7 +1310,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             }
             else
                 lm->showPointMesh("sceneCloud_0", true);
-            if ( showCloudSemanticColored )
+            if constexpr ( showCloudSemanticColored )
             {
                 VisMesh::Ptr sm = showSemanticColored<MarsMapPointCloud>( old_last_scene_cloud, new_scene_map_pose );
                 CloudPtr vmm = sm->getPointMesh();
@@ -1330,7 +1335,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
         if ( showSceneSurfels )
         {
             StopWatch total;
-            constexpr bool showSemanticColored = true;
+            constexpr bool showSemanticColored = has_semantics_v<MarsMapPointCloud>;
             MarsMap * last_scene = sceneMapPtrVec[0];
             VisMesh v, n, s;
             const Eigen::Vector3f rc = VisMesh::randColor();
@@ -1339,7 +1344,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             last_scene->getCells( scene_cells, pose );
             v.reserveSurfelTriangleEllipsoid(scene_cells.size());
             n.reserveSurfelTriangleEllipsoid(scene_cells.size());
-            if ( showSemanticColored )
+            if constexpr ( showSemanticColored )
                 s.reserveSurfelTriangleEllipsoid(scene_cells.size());
             for ( const SurfelInfoConstPtr & cell : scene_cells )
             {
@@ -1353,12 +1358,13 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                     v.addSurfel( cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, (cell->m_center_s + cell->m_surfel->mean_), rc,last_scene->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
                     n.addSurfel( cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, (cell->m_center_s + cell->m_surfel->mean_), VisMesh::colorFromNormal(cell->m_surfel->normal_),last_scene->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
                 }
-                if ( showSemanticColored && cell->m_class )
+                if constexpr ( showSemanticColored )
+                    if ( cell->m_class )
                     s.addSurfel(cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, cell->m_center_s + cell->m_surfel->mean_, m_label_manager->color_for_label(cell->m_class->getArgMaxClass()).cast<float>(), asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
             }
             v.showSurfelMesh("lastSceneSurfels", true, m_localMarsMap->local_map_pose * new_scene_pose,m_surfel_type);
             n.showSurfelMesh("lastSceneSurfelsN", true, m_localMarsMap->local_map_pose * new_scene_pose,m_surfel_type);
-            if ( showSemanticColored )
+            if constexpr ( showSemanticColored )
                 s.showSurfelMesh("lastSceneSurfelsSem", true, m_localMarsMap->local_map_pose * new_scene_pose,m_surfel_type);
             //n.showEdgeMesh("lastSceneSurfelNormals", true, new_scene_pose);
             //f.showEdgeMesh("lastSceneSurfelFirstViewDir", true, new_scene_pose);
@@ -1376,7 +1382,7 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                 scene->getCells( scene_cells, pose );
                 v.reserveSurfelTriangleEllipsoid(scene_cells.size());
                 n.reserveSurfelTriangleEllipsoid(scene_cells.size());
-                if ( showSemanticColored )
+                if constexpr ( showSemanticColored )
                     s.reserveSurfelTriangleEllipsoid(scene_cells.size());
                 for ( const SurfelInfoConstPtr & cell : scene_cells )
                 {
@@ -1393,12 +1399,13 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
                         v.addSurfel( cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, (cell->m_center_s + cell->m_surfel->mean_), rc, scene->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
                         n.addSurfel( cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, (cell->m_center_s + cell->m_surfel->mean_), VisMesh::colorFromNormal(cell->m_surfel->normal_.normalized()), scene->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
                     }
-                    if ( showSemanticColored && cell->m_class )
+                    if constexpr ( showSemanticColored )
+                        if ( cell->m_class )
                         s.addSurfel(cell->m_surfel->eigen_vectors_, cell->m_surfel->eigen_values_, cell->m_center_s + cell->m_surfel->mean_, m_label_manager->color_for_label(cell->m_class->getArgMaxClass()).cast<float>(), asOneCenteredLocalMap->m_map_params.getCellSizeOnLevel(cell->m_level)/2,m_surfel_type);
                 }
                 v.showSurfelMesh("sceneSurfels_"+std::to_string(idx), true, interp_scene_pose,m_surfel_type);
                 n.showSurfelMesh("sceneSurfelsN_"+std::to_string(idx), true, interp_scene_pose,m_surfel_type);
-                if ( showSemanticColored )
+                if constexpr ( showSemanticColored )
                     s.showSurfelMesh("sceneSurfelsSem_"+std::to_string(idx), true, interp_scene_pose,m_surfel_type);
                 //n.showEdgeMesh("sceneSurfelNormals_"+std::to_string(idx), true, interp_scene_pose);
                 //f.showEdgeMesh("sceneSurfelFirstViewDir_"+std::to_string(idx), true, interp_scene_pose);

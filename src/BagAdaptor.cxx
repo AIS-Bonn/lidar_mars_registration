@@ -126,6 +126,7 @@ void BagAdaptor::initializeBagReader( )
     LOG(INFO) << "Reading clouds... fix: " << m_fix_ouster_tf << " " << m_fix_gps_to_baselink_tf << " min: " << m_bag_reader->getMinTimeStamp() << " max: " << m_bag_reader->getMaxTimeStamp();
     std::vector<geometry_msgs::TransformStamped> poses;
 
+    std::map<int64_t,sensor_msgs::Imu> imu_msgs;
     std::vector<ros::Time> ts;
     if ( m_inc_mode )
     {
@@ -154,7 +155,7 @@ void BagAdaptor::initializeBagReader( )
             std::vector<sensor_msgs::Imu::ConstPtr> imus;
             m_bag_reader->readMessages<sensor_msgs::Imu>(imus, times, m_imu_topic);
             LOG(INFO) << "copying imu.";
-            for ( auto imu : imus ) m_imu_msgs.emplace_back( *imu );
+            for ( auto imu : imus ){ m_imu_msgs.emplace_back( *imu ); imu_msgs[imu->header.stamp.toNSec()] = *imu; }
             LOG(INFO) << "loaded imu.";
         }
         if ( m_load_gps )
@@ -221,12 +222,9 @@ void BagAdaptor::initializeBagReader( )
         const Eigen::Quaterniond tfq(tf.transform.rotation.w, tf.transform.rotation.x, tf.transform.rotation.y, tf.transform.rotation.z);
         if ( tfq.norm() > 0.01 )
         {
-            m_q_lidar_imu = tfq.normalized();
-            m_pose_lidar_imu.so3().setQuaternion(m_q_lidar_imu);
+            m_pose_lidar_imu.so3().setQuaternion(tfq.normalized());
             m_pose_lidar_imu.translation() << tf.transform.translation.x, tf.transform.translation.y, tf.transform.translation.z;
         }
-        else
-            m_q_lidar_imu.setIdentity();
 
         if ( m_bag_reader->hasNonStatic() )
         {
@@ -266,7 +264,7 @@ void BagAdaptor::initializeBagReader( )
 #endif
                 point_times.array() += m_compensate_offset;
                 const int64_t cur_time = cloudMsg->header.stamp.toNSec();
-                compensateOrientation( cloud, point_times, cur_time, last_time, m_imu_msgs, m_q_lidar_imu );
+                compensateOrientation( cloud, point_times, cur_time, last_time, imu_msgs, m_pose_lidar_imu.so3() );
                 last_time = cur_time;
 
                 if ( m_store_compensated )
@@ -389,7 +387,13 @@ CloudPtr BagAdaptor::cloudMsgToCloud( sensor_msgs::PointCloud2::ConstPtr cloudMs
         {
             ZoneScopedN("CopyMsgToCloud::compensateOrientation");
             times.array() += m_compensate_offset;
-            compensateOrientation( cloud, times, cloudMsg->header.stamp.toNSec(), last_time, m_imu_msgs, m_q_lidar_imu );
+            // stupid quick fix:
+            const int64_t cur_time = cloudMsg->header.stamp.toNSec();
+            std::map<int64_t, sensor_msgs::Imu> imu_msgs; // stupid quick fix
+            for ( const sensor_msgs::Imu & msg : m_imu_msgs )
+                if ( msg.header.stamp.toNSec() >= last_time && msg.header.stamp.toNSec() <= cur_time )
+                    imu_msgs[msg.header.stamp.toNSec()] = msg;
+            compensateOrientation( cloud, times, cur_time, last_time, imu_msgs, m_pose_lidar_imu.so3() );
         }
     }
 #ifdef USE_EASY_PBR

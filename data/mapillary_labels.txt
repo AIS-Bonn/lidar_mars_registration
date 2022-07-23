@@ -1,0 +1,15 @@
+background             
+building/wall        
+barrier                
+road                   
+sidewalk               
+person                 
+rider                  
+vegetation            
+sky                   
+water                 
+hydrant               
+motor-/bicycle    
+train                 
+vehicle               
+foreground object
