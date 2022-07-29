@@ -44,7 +44,7 @@ $ make
 ### Running with EasyPBR:
 After building one can run the executable created in the build folder with 
 ```sh
-$ ./build/temp.linux-x86_64-3.6/run_lidar_mrsctmap_registration
+$ ./build/temp.linux-x86_64-3.6/run_lidar_mars_registration
 ```
 or
 ```sh

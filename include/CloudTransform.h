@@ -371,7 +371,6 @@ static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, MeshCloudPtr
     bool has_z = false;
     bool has_intensity = false;
     bool has_reflectivity = false;
-    bool has_range = false;
     bool has_time = true;
     bool has_semantic = false;
     uint32_t offset_x = 0;
@@ -415,10 +414,6 @@ static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, MeshCloudPtr
             has_reflectivity = true;
             offset_reflectivity = cloudMsg->fields[i].offset;
         }
-        if ( cloudMsg->fields[i].name=="range" )
-        {
-            has_range = true;
-        }
         if ( cloudMsg->fields[i].name=="t" )
         {
             has_time = true;
@@ -435,7 +430,7 @@ static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, MeshCloudPtr
     const size_t numPoints = cloudMsg->height*cloudMsg->width;
 
     cloud->V.resize(numPoints, 3);
-    if ( has_range ) cloud->D.resize(numPoints, 1);
+    cloud->D.resize(numPoints, 1);
     if ( has_intensity ) cloud->I.resize(numPoints, 1);
     if ( has_reflectivity ) cloud->C.resize(numPoints, 3);
     if ( has_time && times != nullptr ) times->resize(numPoints,1);
@@ -465,7 +460,7 @@ static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, MeshCloudPtr
                            *reinterpret_cast<const float*>(&cloudMsg->data[point_start + offset_y]),
                            *reinterpret_cast<const float*>(&cloudMsg->data[point_start + offset_z]);
 
-        if ( has_range ) cloud->D.row(i) << cloud->V.row(i).norm();
+        cloud->D.row(i) << cloud->V.row(i).norm();
         if ( has_intensity ) cloud->I.row(i) << *reinterpret_cast<const float*>(&cloudMsg->data[point_start + offset_intensity])/6000.0;
         if ( has_reflectivity ) cloud->C.row(i).setConstant((*reinterpret_cast<const uint16_t*>(&cloudMsg->data[point_start + offset_reflectivity])/ float(std::numeric_limits<uint16_t>::max() ) ) );
         if ( has_time && times != nullptr ) times->row(i) << *reinterpret_cast<const uint32_t*>(&cloudMsg->data[point_start + offset_time]);
@@ -474,7 +469,7 @@ static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, MeshCloudPtr
 
         if ( !cloud->D.row(i).allFinite() ){
             cloud->V.row(i).setZero();
-            if ( has_range ) cloud->D.row(i).setZero();
+            cloud->D.row(i).setZero();
             if ( has_intensity ) cloud->I.row(i).setZero();
             if ( has_reflectivity ) cloud->C.row(i).setZero();
             if ( has_time && times != nullptr ) times->row(i).setZero();
