@@ -1,0 +1,6 @@
+<launch>
+  <!--<node launch-prefix="gdb -ex run --args" name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v INFO" output="screen" />-->
+  <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v INFO" output="screen" />
+</launch>
+
+
