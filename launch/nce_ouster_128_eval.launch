@@ -1,0 +1,15 @@
+<launch>
+  <param name="/use_sim_time" value="true" />
+
+  <node pkg="tf" type="static_transform_publisher" name="baselink_gps_broadcaster" args="0 0 0  0 0 0 base_link base_link_gps 100" />
+  <node pkg="tf" type="static_transform_publisher" name="baselink_field_broadcaster" args="0 0 0  0 0 0 base_link_gps field 100" />
+  <node pkg="tf" type="static_transform_publisher" name="base_imu_broadcaster" args=" 0 0 0 0 0 0 base_link imu_link 100 "/>
+  <node pkg="tf" type="static_transform_publisher" name="imu_sensor_broadcaster" args=" 0 0 0 0 0 0 imu_link imu_sensor_frame 100 "/>
+  <node pkg="tf" type="static_transform_publisher" name="imu_os_broadcaster" args=" -0.037 -0.008 -0.062 0 1 0 0 imu_link os_lidar 100 "/>
+
+  <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v WARNING " output="screen">
+     <param name="config_file_rel" type="str" value="./config/newer_college_ext.cfg" />
+  </node>
+</launch>
+
+
