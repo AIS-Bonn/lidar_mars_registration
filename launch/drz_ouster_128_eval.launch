@@ -2,6 +2,11 @@
 
   <param name="/use_sim_time" value="true" />
 
+  <node pkg="tf" type="static_transform_publisher" name="baselink_BodyFLU_broadcaster" args="0 0 0 0 0 0 1 base_link body_FLU 100" />
+  <node pkg="tf" type="static_transform_publisher" name="baselink_os_broadcaster" args="0.032 0.083 -0.217 1 -1 0 0 base_link os_lidar 100" />
+  <node pkg="tf" type="static_transform_publisher" name="baselink_gps_broadcaster" args="0 0 0  0 0 0 base_link base_link_gps 100" />
+  <node pkg="tf" type="static_transform_publisher" name="baselink_field_broadcaster" args="0 0 0  0 0 0 base_link_gps field 100" />
+
   <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v INFO " output="screen" />
 
 </launch>
