@@ -140,6 +140,7 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
     m_num_scan_columns = dyn_config["num_scan_columns"];
     m_num_scans_per_second = dyn_config["num_scans_per_second"];
 
+    m_scan_time_offset_ns = TimeConversion::to_ns(double(dyn_config["scan_time_offset"]));
     m_compensate_orientation = dyn_config["compensate_orientation"];
     m_use_gyro_directly = dyn_config["use_gyro_directly"];
     m_organized_scans = dyn_config["organized_scans"];
@@ -297,8 +298,8 @@ MsgsPtr getCurrentMsgs( const MsgsPtr & m_msgs, std::mutex & msgMutex, const int
 void MarsSplineRegistrationAdaptor::cloud_msgs_ros ( const sensor_msgs::PointCloud2::ConstPtr& inputCloud )
 {
     if ( ! inputCloud ) return;
-    static int64_t last_cloud_stamp = inputCloud->header.stamp.toNSec();
-    const int64_t current_cloud_stamp = inputCloud->header.stamp.toNSec();
+    static int64_t last_cloud_stamp = inputCloud->header.stamp.toNSec() + m_scan_time_offset_ns;
+    const int64_t current_cloud_stamp = inputCloud->header.stamp.toNSec() + m_scan_time_offset_ns;
     static int64_t last_seq_id = inputCloud->header.seq;
     const int64_t cur_seq_id = inputCloud->header.seq;
 
@@ -615,7 +616,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
 
     m_cur_pose_baselink_sensor = transformToSophus(transform_baselink_sensor.transform); //Sophus::SE3d ( cur_pose_baselink_sensor_eigen.matrix() );
 
-    static ros::Time last_stamp = inputCloud->header.stamp;
+    static ros::Time last_stamp = ros::Time().fromNSec(m_scan_time_offset_ns + inputCloud->header.stamp.toNSec());
     MarsMapPointCloud::Ptr sceneCloud = MarsMapPointCloud::create();
     ros::Time input_stamp;
     {
@@ -623,7 +624,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     MarsMapPointCloud::Ptr sceneCloudTmp = MarsMapPointCloud::create();
     copyCloud<MarsMapPointCloud> ( inputCloud, sceneCloudTmp );
     convertToMapCloud<MarsMapPointCloud,MarsMapPointCloud>( sceneCloudTmp, sceneCloud, m_scan_id );
-    input_stamp = inputCloud->header.stamp;
+    input_stamp = ros::Time().fromNSec(m_scan_time_offset_ns + inputCloud->header.stamp.toNSec());
     if ( m_compensate_orientation && imu_msgs && input_stamp > last_stamp )
     {
         compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), *imu_msgs, m_cur_pose_baselink_sensor.so3(), m_min_range*m_min_range, m_use_gyro_directly );
