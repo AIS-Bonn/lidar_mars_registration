@@ -343,8 +343,8 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
         oldMaps.pop_back();
         {
             ZoneScopedN("MarsMapWindow::AddSingleCloud::clearPrev");
-            //maps.back()->clear();
-            maps.back() = MarsMapType::create(maps.back()->m_map_params);
+            maps.back()->clear();
+            //maps.back() = MarsMapType::create(maps.back()->m_map_params);
         }
         {
             ZoneScopedN("MarsMapWindow::AddSingleCloud::setCloud");
@@ -438,9 +438,10 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
                         newCloudMap->transform_points(map_integration_pose);
 
                     {
-                        ZoneScopedN("MarsMapWindow::AddCellsOneCloud::clear_map_lvl");
+                        // clear down below after processing instead
+                        //ZoneScopedN("MarsMapWindow::AddCellsOneCloud::clear_map_lvl");
                         //mapPtr[lvl]->clear();
-                        mapPtr[lvl] = MarsMapType::create(mapPtr[lvl]->m_map_params);
+                        //mapPtr[lvl] = MarsMapType::create(mapPtr[lvl]->m_map_params);
                     }
                     {
                         ZoneScopedN("MarsMapWindow::AddCellsOneCloud::set_cloud_lvl");
@@ -604,6 +605,10 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
             LOG(1) << "MarsMapWindow::LvlCells: invalid: " << num_invalid << " less: " << num_less_pts << " valid: " << num_valid;
         }
 #endif
+        for ( int lvl = 0; lvl < asOneMap->m_map_params.m_num_levels; ++lvl )
+        {
+            mapPtr[lvl]->clear();
+        }
     }
     LOG(1) << "cloud size: " << clouds.size() << " " << maps.size() << " qs: " << queue_size;
 }

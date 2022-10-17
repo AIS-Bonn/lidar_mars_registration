@@ -167,6 +167,7 @@ private:
     double m_inv_vert_sensor_res = 1./0.7;
     double m_inv_hori_sensor_res = m_num_scan_columns / 360.;
     int64_t m_scan_time_offset_ns = 0;
+    bool m_stamp_at_front = false;
 
     double m_gps_invalid_threshold = 6;
     double m_downsampled_scan_res = 0.1;

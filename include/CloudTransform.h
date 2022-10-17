@@ -362,7 +362,7 @@ static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::Ve
 }
 
 #ifdef USE_EASY_PBR
-static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, MeshCloudPtr cloud, Eigen::VectorXi * times = nullptr )
+static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, MeshCloudPtr cloud, Eigen::VectorXi * times = nullptr, const bool & stamp_at_front = false )
 {
     if ( ! cloudMsg ) return;
     bool has_rgb = false;
@@ -476,11 +476,13 @@ static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, MeshCloudPtr
         }
     }
     cloud->t = cloudMsg->header.stamp.toNSec();
+    if ( has_time && times != nullptr && stamp_at_front )
+        cloud->t += times->maxCoeff();
 }
 #endif
 
 template<typename MarsPointCloud>
-static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, typename MarsPointCloud::Ptr cloud, Eigen::VectorXi * times = nullptr )
+static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, typename MarsPointCloud::Ptr cloud, Eigen::VectorXi * times = nullptr, const bool & stamp_at_front = false )
 {
     if ( ! cloudMsg ) return;
     bool has_rgb = false;
@@ -623,6 +625,8 @@ static void copyCloud( sensor_msgs::PointCloud2::ConstPtr cloudMsg, typename Mar
     cloud->m_last_added_point = numPoints;
     cloud->m_stamp = cloudMsg->header.stamp.toNSec();
     if ( has_time && times != nullptr ) *times = cloud->m_scan_time;
+    if ( has_time && stamp_at_front ) // moves stamp to back like we need!
+        cloud->m_stamp += cloud->m_scan_time.maxCoeff();
 }
 
 template<typename MarsPointCloud>

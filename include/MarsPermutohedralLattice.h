@@ -114,6 +114,7 @@ public:
     typedef Eigen::Matrix<Scalar,pos_dim,hom_dim> MatPH;
     typedef Eigen::Matrix<Scalar,pos_dim,Eigen::Dynamic> MatX;
 
+    Eigen::VectorXi m_last_capacity;
     VecP m_scale_factor;
     absl::FixedArray<Scalar,MapParameters::maxAllowedMapLevels> m_sigmas; // now stores for each level
 

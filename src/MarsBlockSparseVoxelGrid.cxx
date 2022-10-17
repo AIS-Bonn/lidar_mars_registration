@@ -49,6 +49,7 @@ BlockSparseVoxelGrid::BlockSparseVoxelGrid( const MapParameters & params )
     : m_map_params ( params ), m_maps ( params.m_num_levels ),
       m_maps_surfel_info ( params.m_num_levels )
 {
+    m_last_capacity = Eigen::VectorXi::Zero(params.m_num_levels,1);
 
 }
 
@@ -80,13 +81,15 @@ SurfelInfoVector BlockSparseVoxelGrid::iterate() const
 void BlockSparseVoxelGrid::allocate()
 {
     ZoneScopedN("BlockSparseVoxelGrid::allocate");
+    constexpr int minCellsCoarse = 512;
     for ( LevelIndexType lvlIdx = 0; lvlIdx < m_map_params.m_num_levels; ++lvlIdx )
     {
         MapLevelType & map_level = m_maps[lvlIdx];
+        m_last_capacity[lvlIdx] = minCellsCoarse * std::pow(2,lvlIdx) - 1;
         if ( map_level.empty() )
-            map_level.reserve(std::min(500.,std::pow(m_map_params.getNumCells(lvlIdx)/m_map_params.block_size,3)));
+            map_level.reserve(m_last_capacity[lvlIdx]/2);
         if ( m_maps_surfel_info[lvlIdx].empty() )
-            m_maps_surfel_info[lvlIdx].reserve(std::min(500.,std::pow(m_map_params.getNumCells(lvlIdx),3)));
+            m_maps_surfel_info[lvlIdx].reserve(m_last_capacity[lvlIdx]/2);
     }
 }
 
@@ -96,6 +99,7 @@ void BlockSparseVoxelGrid::clear()
     ZoneScopedN("BlockSparseVoxelGrid::clear");
     for ( LevelIndexType lvl = 0; lvl < m_map_params.m_num_levels; ++lvl )
     {
+        m_last_capacity[lvl] = m_maps[lvl].capacity();
         {
         ZoneScopedN("BlockSparseVoxelGrid::clear::map_lvl");
         m_maps[lvl].clear();
@@ -647,7 +651,11 @@ int BlockSparseVoxelGrid::addCloud( MarsMapPointCloud::Ptr cloud, const Sophus::
 #endif
         ZoneScopedN("BlockSparseVoxelGrid::addCloudBlockSparse::PerLevel");
         MapLevelType & map_level = m_maps[lvlIdx];
+        if ( map_level.capacity() < m_last_capacity[lvlIdx] )
+            map_level.reserve(m_last_capacity[lvlIdx] / 2);
+
         absl::flat_hash_set<CellIndexType> & changed_level_blocks = changedBlocks[lvlIdx];
+        changed_level_blocks.reserve(m_last_capacity[lvlIdx] / 2);
         IndexType blockInsideIdx = 0;
         for ( int pointIdx = 0; pointIdx < num_pts; ++pointIdx)
         {

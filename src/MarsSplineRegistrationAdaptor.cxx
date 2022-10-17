@@ -141,6 +141,7 @@ void MarsSplineRegistrationAdaptor::init_params(const std::string & config_file)
     m_num_scans_per_second = dyn_config["num_scans_per_second"];
 
     m_scan_time_offset_ns = TimeConversion::to_ns(double(dyn_config["scan_time_offset"]));
+    m_stamp_at_front = dyn_config["stamp_at_front"];
     m_compensate_orientation = dyn_config["compensate_orientation"];
     m_use_gyro_directly = dyn_config["use_gyro_directly"];
     m_organized_scans = dyn_config["organized_scans"];
@@ -622,9 +623,9 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     {
     ZoneScopedN("MarsSplineRegistrationAdaptor::Conversion");
     MarsMapPointCloud::Ptr sceneCloudTmp = MarsMapPointCloud::create();
-    copyCloud<MarsMapPointCloud> ( inputCloud, sceneCloudTmp );
+    copyCloud<MarsMapPointCloud> ( inputCloud, sceneCloudTmp, nullptr, m_stamp_at_front );
     convertToMapCloud<MarsMapPointCloud,MarsMapPointCloud>( sceneCloudTmp, sceneCloud, m_scan_id );
-    input_stamp = ros::Time().fromNSec(m_scan_time_offset_ns + inputCloud->header.stamp.toNSec());
+    input_stamp = ros::Time().fromNSec(m_scan_time_offset_ns + sceneCloud->m_stamp);
     if ( m_compensate_orientation && imu_msgs && input_stamp > last_stamp )
     {
         compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), *imu_msgs, m_cur_pose_baselink_sensor.so3(), m_min_range*m_min_range, m_use_gyro_directly );

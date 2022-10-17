@@ -53,6 +53,7 @@ PermutohedralLattice<P>::PermutohedralLattice ( const MapParameters & params, co
 {
     //lattice properties
     m_scale_factor = compute_scale_factor();
+    m_last_capacity = Eigen::VectorXi::Zero(params.m_num_levels,1);
 
     const Scalar spatial_dist_between_vertices = m_map_params.getCellSizeOnLevel(0); // X in meters, with 'nearest' -> each has influence/size of X meters
     const Scalar spatial_sigma = (spatial_dist_between_vertices/2.) / std::sqrt(3.);
@@ -789,13 +790,16 @@ int PermutohedralLattice<P>::addCloud(MarsMapPointCloud::Ptr cloud, const Sophus
     const Eigen::Matrix3Xf pts_s = (pose_s1s2.so3().cast<float>().matrix() * cloud->m_points).colwise() + pose_s1s2.translation().cast<float>();
     const int scan_id = cloud->single_scan() ? cloud->m_scan_id(0) : -1;
     const int num_pts = cloud->size();
+
     int num_points = 0;
     #pragma omp parallel for num_threads(OPT_THREAD_NUM) reduction(+:num_points)
     for ( LevelIndexType lvlIdx = 0; lvlIdx < m_map_params.m_num_levels; ++lvlIdx )
     {
         MapLevelType & map_level = m_maps[lvlIdx];
+        if ( map_level.capacity() < m_last_capacity[lvlIdx] )
+            map_level.reserve(m_last_capacity[lvlIdx] / 2);
         absl::flat_hash_set<CellIndexType> & changed_level_cells = changedCells[lvlIdx];
-        changed_level_cells.reserve(0.1*num_pts);
+        changed_level_cells.reserve(m_last_capacity[lvlIdx] / 2);
 
         VecI key;
         VecHi vKey = VecHi::Zero();
@@ -1004,13 +1008,15 @@ template <int P>
 void PermutohedralLattice<P>::allocate()
 {
     ZoneScopedN("PermutohedralLattice::allocate");
+    constexpr int minCellsCoarse = 512;
     for ( LevelIndexType lvlIdx = 0; lvlIdx < m_map_params.m_num_levels; ++lvlIdx )
     {
         MapLevelType & map_level = m_maps[lvlIdx];
+        m_last_capacity[lvlIdx] = minCellsCoarse * std::pow(2,lvlIdx) - 1;
         if ( map_level.empty() )
-            map_level.reserve(std::min(1e5,std::pow(m_map_params.getNumCells(lvlIdx),3)));
+            map_level.reserve(m_last_capacity[lvlIdx]/2);
         if ( m_maps_surfel_info[lvlIdx].empty() )
-            m_maps_surfel_info[lvlIdx].reserve(std::min(1e5,std::pow(m_map_params.getNumCells(lvlIdx),3)));
+            m_maps_surfel_info[lvlIdx].reserve(m_last_capacity[lvlIdx]/2);
     }
 }
 
@@ -1019,6 +1025,7 @@ void PermutohedralLattice<P>::clear()
 {
     for ( LevelIndexType lvl = 0; lvl < LevelIndexType(m_maps.size()); ++lvl )
     {
+        m_last_capacity[lvl] = m_maps[lvl].capacity();
         m_maps[lvl].clear();
         m_maps_surfel_info[lvl].clear();
     }

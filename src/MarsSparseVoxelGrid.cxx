@@ -42,6 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 SparseVoxelGrid::SparseVoxelGrid( const MapParameters & params )
     : m_map_params ( params ), m_maps ( params.m_num_levels ), m_maps_surfel_info ( params.m_num_levels )
 {
+    m_last_capacity = Eigen::VectorXi::Zero(params.m_num_levels,1);
     const Eigen::VectorXd d = getDistancesBetweenVertices();
     LOG(1) << "dist between vertices: " << d.transpose();
 }
@@ -72,13 +73,15 @@ Eigen::VectorXd SparseVoxelGrid::getDistancesBetweenVertices() const
 void SparseVoxelGrid::allocate()
 {
     ZoneScopedN("SparseVoxelGrid::allocate");
+    constexpr int minCellsCoarse = 512;
     for ( LevelIndexType lvlIdx = 0; lvlIdx < m_map_params.m_num_levels; ++lvlIdx )
     {
         MapLevelType & map_level = m_maps[lvlIdx];
+        m_last_capacity[lvlIdx] = minCellsCoarse * std::pow(2,lvlIdx) - 1;
         if ( map_level.empty() )
-            map_level.reserve(std::min(3*1e3,std::pow(m_map_params.getNumCells(lvlIdx),3)));
+            map_level.reserve(m_last_capacity[lvlIdx]/2);
         if ( m_maps_surfel_info[lvlIdx].empty() )
-            m_maps_surfel_info[lvlIdx].reserve(std::min(3*1e3,std::pow(m_map_params.getNumCells(lvlIdx),3)));
+            m_maps_surfel_info[lvlIdx].reserve(m_last_capacity[lvlIdx]/2);
     }
 }
 
@@ -106,6 +109,7 @@ void SparseVoxelGrid::clear()
 {
     for ( LevelIndexType lvl = 0; lvl < LevelIndexType(m_maps.size()); ++lvl )
     {
+        m_last_capacity[lvl] = m_maps[lvl].capacity();
         m_maps[lvl].clear();
         m_maps_surfel_info[lvl].clear();
     }
@@ -573,9 +577,11 @@ int SparseVoxelGrid::addCloud ( MarsMapPointCloud::Ptr cloud, const Sophus::SE3d
     for ( LevelIndexType lvlIdx = 0; lvlIdx < m_map_params.m_num_levels; ++lvlIdx )
     {
         MapLevelType & map_level = m_maps[lvlIdx];
-
+        if ( map_level.capacity() < m_last_capacity[lvlIdx] )
+            map_level.reserve(m_last_capacity[lvlIdx] / 2);
         absl::flat_hash_set<CellIndexType> & changed_level_cells = changedCells[lvlIdx];
-        changed_level_cells.reserve(0.1*num_pts);
+        changed_level_cells.reserve(m_last_capacity[lvlIdx] / 2);
+
         for ( int pointIdx = 0; pointIdx < num_pts; ++pointIdx)
         {
             const Eigen::Vector3f pt_s = pts_s.col(pointIdx);

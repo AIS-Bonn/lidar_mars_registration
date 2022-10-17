@@ -82,7 +82,7 @@ public:
     int addCellsOnGrid ( const std::vector<SurfelInfoT> & surfels, const Eigen::Vector3d & orig_t_s1s2, const LevelIndexType & level_modifier );
 
     void clear();
-
+    Eigen::VectorXi m_last_capacity;
     void allocate();
     SurfelInfoVector iterate() const;
     Eigen::VectorXd getDistancesBetweenVertices() const;
