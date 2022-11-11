@@ -616,10 +616,13 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     }
 
     m_cur_pose_baselink_sensor = transformToSophus(transform_baselink_sensor.transform); //Sophus::SE3d ( cur_pose_baselink_sensor_eigen.matrix() );
+    //LOG(1) << "baselink_sensor " << m_cur_pose_baselink_sensor.params().transpose();
 
     static ros::Time last_stamp = ros::Time().fromNSec(m_scan_time_offset_ns + inputCloud->header.stamp.toNSec());
     MarsMapPointCloud::Ptr sceneCloud = MarsMapPointCloud::create();
     ros::Time input_stamp;
+    Sophus::SO3d rotation_prior;
+    bool rotation_prior_valid = false;
     {
     ZoneScopedN("MarsSplineRegistrationAdaptor::Conversion");
     MarsMapPointCloud::Ptr sceneCloudTmp = MarsMapPointCloud::create();
@@ -628,7 +631,9 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     input_stamp = ros::Time().fromNSec(m_scan_time_offset_ns + sceneCloud->m_stamp);
     if ( m_compensate_orientation && imu_msgs && input_stamp > last_stamp )
     {
-        compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), *imu_msgs, m_cur_pose_baselink_sensor.so3(), m_min_range*m_min_range, m_use_gyro_directly );
+        rotation_prior = compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), *imu_msgs, m_cur_pose_baselink_sensor.so3(), m_min_range*m_min_range, m_use_gyro_directly );
+        rotation_prior_valid = true;
+        //LOG(1) << "rot prior: " << rotation_prior.params().transpose();
     }
     }
 
@@ -678,6 +683,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     const Sophus::SE3d cur_pose_gps_world_sensor = (firstPose_lidar_imu * curPose_imu_lidar);
 
     // assuming the cloud is centered at Identity()
+    m_marsRegistrator->setCurRot ( rotation_prior, rotation_prior_valid );
     m_marsRegistrator->setCurPose ( cur_pose_gps_world_sensor, gps_valid );
     const Sophus::SE3d pose_map_sensor = m_marsRegistrator->register_cloud ( sceneCloud );
     const Sophus::SE3d pose_world_map = m_marsRegistrator->getMapPose();

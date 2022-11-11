@@ -383,7 +383,10 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
 
                     Sophus::SE3d new_pose_wi;
                     new_pose_wi.translation() = P_wi.translation() + v_w * dt; // + 0.5 * a_wi * dt * dt;
-                    new_pose_wi.so3() = P_wi.so3() * Sophus::SO3d::exp( dt * r_i );
+                    if ( m_rotation_prior_valid )
+                        new_pose_wi.so3() = P_wi.so3() * m_rotation_prior;
+                    else
+                        new_pose_wi.so3() = P_wi.so3() * Sophus::SO3d::exp( dt * r_i );
 
                     //LOG(1) << "r: " << r_i.transpose() //<< " a: " << a_w.transpose()
                     //          << " v: " << v_w.transpose() << " dt: " << dt << " t: " << P_wi.translation().transpose();

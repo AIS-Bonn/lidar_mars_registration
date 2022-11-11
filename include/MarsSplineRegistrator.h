@@ -60,6 +60,11 @@ public:
         return std::shared_ptr<MarsSplineRegistrator>( new MarsSplineRegistrator(std::forward<Args>(args)...) );
     }
 
+    void setCurRot ( const Sophus::SO3d & rotation_prior, const bool & rotation_prior_valid = false )
+    {
+        m_rotation_prior = rotation_prior;
+        m_rotation_prior_valid = rotation_prior_valid;
+    }
     void setCurPose ( const Sophus::SE3d & cur_pose, const bool & cur_pose_valid = false )
     {
         m_cur_pose = cur_pose;
@@ -70,8 +75,10 @@ public:
         m_cur_pos = cur_pos;
         m_cur_pos_valid = cur_pos_valid;
     }
+    Sophus::SO3d m_rotation_prior; // for init
     Sophus::SE3d m_cur_pose; // gps pose
     Sophus::SE3d m_cur_pos; // vo pos
+    bool m_rotation_prior_valid = false;
     bool m_cur_pose_valid = false;
     bool m_cur_pos_valid = false;
 

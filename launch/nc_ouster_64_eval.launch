@@ -1,0 +1,16 @@
+<launch>
+  <param name="/use_sim_time" value="true" />
+
+  <node pkg="tf" type="static_transform_publisher" name="baselink_gps_broadcaster" args="0 0 0  0 0 0 base_link base_link_gps 100" />
+  <node pkg="tf" type="static_transform_publisher" name="baselink_field_broadcaster" args="0 0 0  0 0 0 base_link_gps field 100" />
+  <node pkg="tf" type="static_transform_publisher" name="base_os_broadcaster" args=" 0.006253 -0.011775 0.007645 0 0 0 os1_sensor os1_imu 100 "/>
+  <node pkg="tf" type="static_transform_publisher" name="os_lidar_broadcaster" args=" 0.0 0.0 0.03618 0 0 1 0 os1_sensor os1_lidar 100 "/>
+  <node pkg="tf" type="static_transform_publisher" name="base_imu_broadcaster" args=" 0 0 0 0 0 0 os1_imu base_link 100 "/>
+  <node pkg="tf" type="static_transform_publisher" name="imu_sensor_broadcaster" args=" 0 0 0 0 0 0 imu_link imu_sensor_frame 100 "/>
+
+  <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v 1 " output="screen">
+     <param name="config_file_rel" type="str" value="./config/oxford.cfg" />
+  </node>
+</launch>
+
+

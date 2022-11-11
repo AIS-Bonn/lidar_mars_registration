@@ -71,7 +71,7 @@ inline Eigen::Vector3d get_gyr_from_msg ( const sensor_msgs::Imu & msg )
 #ifdef USE_EASY_PBR
 #include "easy_pbr/Scene.h"
 
-static void compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
+static Sophus::SO3d compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
 {
     //constexpr bool print_info = false;
     if ( last_scan_ns == 0 ) return;
@@ -171,7 +171,7 @@ static void compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & t
                 {
                     it_next = std::next(it_next);
                     it_cont = it_next;
-    }
+                }
             }
             else
             {
@@ -213,14 +213,18 @@ static void compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & t
     //}
     //if constexpr ( print_info )
     //LOG(1) << "orientation comp took: " << watch.getTime() << " i: " << imu_msgs.size() << " o: " << oris.size() << " s: " << num_slerped;
+    if ( !oris.empty() )
+        return oris.crbegin()->second.first;
+    else
+        return Sophus::SO3d();
 }
 #endif
 
-static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
+static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
 {
     //constexpr bool print_info = false;
-    if ( last_scan_ns == 0 ) return;
-    if ( imu_msgs.size() < 2 ) return;
+    if ( last_scan_ns == 0 ) return Sophus::SO3d();
+    if ( imu_msgs.size() < 2 ) return Sophus::SO3d();
     //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation");
     //StopWatch watch;
     int64_t first_imu_ns = imu_msgs.cbegin()->first;
@@ -261,7 +265,7 @@ static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::Ve
     if ( bit == imu_msgs.end() || lit == imu_msgs.end() )
     {
         //LOG(WARNING) << "could not find iterators. t1: " << first_imu_ns << " tn: " << last_imu_ns;
-        return;
+        return Sophus::SO3d();
     }
     const auto nit = std::next(lit);
     {
@@ -291,7 +295,7 @@ static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::Ve
     for ( std::pair<const int64_t, std::pair<Sophus::SO3d,Eigen::Vector3d>> & it : oris )
     {
         it.second.first = ref_ori_lidar * it.second.first; // premultiply ref_ori to get relative to last one.
-        }
+    }
     auto it_cont = oris.cbegin();
 
     const int64_t offset = stamp_at_beginning ? 0 : -max_time_ns;  // max_time_ns is at cloud_stamp => go to first time.
@@ -327,7 +331,7 @@ static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::Ve
             if ( it_next == oris.cend() ) // none larger: get last one, we will cap time
             {
                 diff_ori_lidar = Sophus::SO3f();
-    }
+            }
             else
             {
                 if ( it_next == oris.cbegin() ) // first one is larger:
@@ -356,9 +360,13 @@ static void compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::Ve
         }
         pts.col(idx) = diff_ori_lidar * pts.col(idx);
     }
+
+    //if ( ! oris.empty() ) { LOG(1) << "ori beg: " << oris.cbegin()->second.first.params().transpose() << " ori end: " << oris.crbegin()->second.first.params().transpose(); }
     //}
     //if constexpr ( print_info )
     //LOG(1) << "orientation comp took: " << watch.getTime() << " i: " << imu_msgs.size() << " o: " << oris.size() << " s: " << num_slerped;
+    const Sophus::SO3d rel_ori = oris.empty() ? Sophus::SO3d() : oris.cbegin()->second.first.inverse();
+    return rel_ori;
 }
 
 #ifdef USE_EASY_PBR
