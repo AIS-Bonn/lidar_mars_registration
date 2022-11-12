@@ -8,7 +8,7 @@
   <node pkg="tf" type="static_transform_publisher" name="base_imu_broadcaster" args=" 0 0 0 0 0 0 os1_imu base_link 100 "/>
   <node pkg="tf" type="static_transform_publisher" name="imu_sensor_broadcaster" args=" 0 0 0 0 0 0 imu_link imu_sensor_frame 100 "/>
 
-  <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v 1 " output="screen">
+  <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v INFO " output="screen">
      <param name="config_file_rel" type="str" value="./config/oxford.cfg" />
   </node>
 </launch>
