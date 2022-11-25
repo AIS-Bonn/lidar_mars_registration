@@ -425,10 +425,10 @@ void PermutohedralLattice<P>::getCellsAdaptive ( SurfelInfoVector & surfels, int
         }
     }
 
-    std::vector<int> surfelsPerLevel(m_maps.size(),0);
-    for ( const auto & s : surfels )
-        ++surfelsPerLevel[s.m_level];
-    LOG(1) << "Adaptive: per lvl: " << Eigen::Map<Eigen::VectorXi>(surfelsPerLevel.data(),surfelsPerLevel.size(), 1).transpose() << " prCoarser: " << prevUseCoarserLevel.size() << " notCL1: " << notInCenterL1;
+//    std::vector<int> surfelsPerLevel(m_maps.size(),0);
+//    for ( const auto & s : surfels )
+//        ++surfelsPerLevel[s.m_level];
+//    LOG(1) << "Adaptive: per lvl: " << Eigen::Map<Eigen::VectorXi>(surfelsPerLevel.data(),surfelsPerLevel.size(), 1).transpose() << " prCoarser: " << prevUseCoarserLevel.size() << " notCL1: " << notInCenterL1;
 }
 
 template <int P>
@@ -566,14 +566,14 @@ int PermutohedralLattice<P>::addCells ( const std::vector<SurfelInfoT> & surfels
         else
             num_points += addCellSurfel ( surfels[idx], pose_s1s2, level_modifier, n_pose_s1s2);
     }
-    Eigen::VectorXi cellsFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
-    Eigen::VectorXi cellsMaxFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
-    for ( size_t lvlIdx = 0; lvlIdx < m_maps.size(); ++lvlIdx )
-    {
-        cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
-        cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
-    }
-    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose(); // << " cp: " << cp;
+//    Eigen::VectorXi cellsFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
+//    Eigen::VectorXi cellsMaxFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
+//    for ( size_t lvlIdx = 0; lvlIdx < m_maps.size(); ++lvlIdx )
+//    {
+//        cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
+//        cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
+//    }
+//    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose(); // << " cp: " << cp;
     return num_points;
 }
 
@@ -770,14 +770,14 @@ int PermutohedralLattice<P>::addCellsOnGrid ( const std::vector<SurfelInfoT> & s
         else
             num_points += addCellSurfelOnGrid ( surfels[idx], t_s1s2, level_modifier, id);
     }
-    Eigen::VectorXi cellsFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
-    Eigen::VectorXi cellsMaxFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
-    for ( size_t lvlIdx = 0; lvlIdx < m_maps.size(); ++lvlIdx )
-    {
-        cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
-        cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
-    }
-    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
+//    Eigen::VectorXi cellsFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
+//    Eigen::VectorXi cellsMaxFilled = Eigen::VectorXi::Zero(m_maps.size(),1);
+//    for ( size_t lvlIdx = 0; lvlIdx < m_maps.size(); ++lvlIdx )
+//    {
+//        cellsFilled[lvlIdx] = m_maps[lvlIdx].size();
+//        cellsMaxFilled[lvlIdx] = m_maps[lvlIdx].capacity();
+//    }
+//    LOG(1) << "num_points: " << num_points << " cellsPerLevel: " << cellsFilled.transpose() << " max: " << cellsMaxFilled.transpose();
     return num_points;
 }
 
@@ -911,7 +911,7 @@ int PermutohedralLattice<P>::addCloud(MarsMapPointCloud::Ptr cloud, const Sophus
             }
         }
     }
-    LOG(1) << "num_points: " << num_points << " ( " << num_pts << " ) updatedCells: " << updated;
+    //LOG(1) << "num_points: " << num_points << " ( " << num_pts << " ) updatedCells: " << updated;
     return num_points;
 }
 

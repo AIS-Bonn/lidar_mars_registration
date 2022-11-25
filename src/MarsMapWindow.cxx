@@ -610,7 +610,7 @@ void MarsMapWindow::addCloud ( MarsMapPointCloud::Ptr newCloud, const Sophus::SE
             mapPtr[lvl]->clear();
         }
     }
-    LOG(1) << "cloud size: " << clouds.size() << " " << maps.size() << " qs: " << queue_size;
+    //LOG(1) << "cloud size: " << clouds.size() << " " << maps.size() << " qs: " << queue_size;
 }
 
 MarsMapTypePtr MarsMapWindow::getAsOneCenteredMap()

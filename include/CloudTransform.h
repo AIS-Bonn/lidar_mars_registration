@@ -222,9 +222,12 @@ static Sophus::SO3d compensateOrientation( MeshCloudPtr cloud, const Eigen::Vect
 
 static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
 {
+    static Sophus::SO3d invalid_quaternion;
+    if ( invalid_quaternion.data()[3] > 0.1 ) invalid_quaternion.data()[3] = 0;
+
     //constexpr bool print_info = false;
-    if ( last_scan_ns == 0 ) return Sophus::SO3d();
-    if ( imu_msgs.size() < 2 ) return Sophus::SO3d();
+    if ( last_scan_ns == 0 ) return invalid_quaternion;
+    if ( imu_msgs.size() < 2 ) return invalid_quaternion;
     //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation");
     //StopWatch watch;
     int64_t first_imu_ns = imu_msgs.cbegin()->first;
@@ -243,6 +246,11 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
     // if first msg is older than last time: it should only be used partially.
     // TODO: handle this correctly!
 
+    if ( firstOneIsOlder )
+    {
+        LOG(WARNING) << "OriComp: First imu is older than last scan: " << first_imu_ns << " < " << last_scan_ns << " skipping and no compensation done.";
+        return invalid_quaternion;
+    }
     Eigen::Matrix3Xf & pts = cloud->m_points;
     const Eigen::VectorXi & pt_times_ns = times;
 
@@ -264,8 +272,8 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
     const auto lit = imu_msgs.find(last_imu_ns);
     if ( bit == imu_msgs.end() || lit == imu_msgs.end() )
     {
-        //LOG(WARNING) << "could not find iterators. t1: " << first_imu_ns << " tn: " << last_imu_ns;
-        return Sophus::SO3d();
+        LOG(WARNING) << "OriComp: could not find iterators. t1: " << first_imu_ns << " tn: " << last_imu_ns;
+        return invalid_quaternion;
     }
     const auto nit = std::next(lit);
     {
@@ -365,7 +373,7 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
     //}
     //if constexpr ( print_info )
     //LOG(1) << "orientation comp took: " << watch.getTime() << " i: " << imu_msgs.size() << " o: " << oris.size() << " s: " << num_slerped;
-    const Sophus::SO3d rel_ori = oris.empty() ? Sophus::SO3d() : oris.cbegin()->second.first.inverse();
+    const Sophus::SO3d rel_ori = oris.empty() ? invalid_quaternion : oris.cbegin()->second.first.inverse();
     return rel_ori;
 }
 
