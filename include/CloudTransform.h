@@ -201,7 +201,7 @@ static Sophus::SO3d compensateOrientation( MeshCloudPtr cloud, const Eigen::Vect
                         //SLERP
                         const int64_t cur_dt_ns = cur_pt_ns - prev_imu_ns;
                         const int64_t imu_dt_ns = next_imu_ns - prev_imu_ns;
-                        const float dt = std::min(1.f, std::max( 0.f, float(TimeConversion::to_s( float(cur_dt_ns) / float(imu_dt_ns)))));
+                        const float dt = std::min(1.f, std::max( 0.f, float(TimeConversion::to_s(cur_dt_ns) / TimeConversion::to_s(imu_dt_ns))));
                         diff_ori_lidar = (it_prev->second.first * Sophus::SO3d::exp( dt * it_prev->second.second ));
                         //++num_slerped;
                     }
@@ -359,7 +359,7 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
                         //SLERP
                         const int64_t cur_dt_ns = cur_pt_ns - prev_imu_ns;
                         const int64_t imu_dt_ns = next_imu_ns - prev_imu_ns;
-                        const float dt = std::min(1.f, std::max( 0.f, float(TimeConversion::to_s( float(cur_dt_ns) / float(imu_dt_ns)))));
+                        const float dt = std::min(1.f, std::max( 0.f, float(TimeConversion::to_s(cur_dt_ns) / TimeConversion::to_s(imu_dt_ns))));
                         diff_ori_lidar = (it_prev->second.first * Sophus::SO3d::exp( dt * it_prev->second.second )).template cast<float>();
                         //++num_slerped;
                     }
