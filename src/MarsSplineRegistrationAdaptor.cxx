@@ -754,7 +754,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
         {
             const Eigen::Vector3d t = interp_pose_firstMap_baselink.translation();
             const Eigen::Quaterniond q = interp_pose_firstMap_baselink.unit_quaternion();
-            regPosesFile << (inputCloud->header.stamp.toNSec()) << " " << t.x() << " " << t.y() << " " << t.z() << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() <<"\n";
+            regPosesFile << (inputCloud->header.stamp.toNSec()) << " " << t.x() << " " << t.y() << " " << t.z() << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << std::endl;
         }
     }
 
