@@ -16,7 +16,7 @@
 
 ### Clone:
 ```sh
-$ git clone https://git.ais.uni-bonn.de/jquenzel/lidar_mars_registration.git --recursive
+$ git clone https://github.com/AIS-Bonn/lidar_mars_registration.git --recursive
 ```
 ### Install dependencies:
 ```sh
