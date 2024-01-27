@@ -38,7 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "MarsFwdDec.h"
 #include "sophus/se3.hpp"
 
-class SceneAssociationData;
+struct SceneAssociationData;
 
 template<typename ModelAssociationT>
 class MarsAssociator

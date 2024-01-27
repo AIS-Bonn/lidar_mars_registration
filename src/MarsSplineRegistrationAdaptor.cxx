@@ -344,6 +344,8 @@ void MarsSplineRegistrationAdaptor::cloud_msgs_ros ( const sensor_msgs::PointClo
     ImuMsgsPtr imu_msgs = getCurrentMsgs<ImuMsgs,ImuMsgsPtr>( m_imu_msgs, imuMsgsMutex, last_cloud_stamp, current_cloud_stamp );
     GpsMsgsPtr gps_msgs = getCurrentMsgs<GpsMsgs,GpsMsgsPtr>( m_gps_msgs, gpsMsgsMutex, last_cloud_stamp, current_cloud_stamp );
 
+    //LOG(1) << "last: " << last_cloud_stamp << " cur: " << current_cloud_stamp << " imu: " << ( imu_msgs ? imu_msgs->size() : 0 );
+
     register_cloud_ros(inputCloud, imu_msgs, gps_msgs );
     last_cloud_stamp = current_cloud_stamp;
     last_seq_id = cur_seq_id;

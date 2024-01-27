@@ -84,8 +84,8 @@ typename PermutohedralLattice<P>::MatHP PermutohedralLattice<P>::getE()
     //E left is has at the bottom a square matrix which has an upper triangular part of ones. Afterwards the whole E_left gets appended another row on top of all ones
     E_left.template bottomRows<pos_dim>().template triangularView<Eigen::Upper>().setOnes();
     //the diagonal of the bottom square is linearly incresing from [-1, -m_pos_dim]
-    E_left.template bottomRows<pos_dim>().template diagonal().setLinSpaced(pos_dim,1,pos_dim);
-    E_left.template bottomRows<pos_dim>().template diagonal()= -E_left.template bottomRows<pos_dim>().diagonal();
+    E_left.template bottomRows<pos_dim>().diagonal().setLinSpaced(pos_dim,1,pos_dim);
+    E_left.template bottomRows<pos_dim>().diagonal()= -E_left.template bottomRows<pos_dim>().diagonal();
     //E_left has the first row all set to ones
     E_left.row(0).setOnes();
     //E right is just a diagonal matrix with entried in the diag set to 1/sqrt((d+1)(d+2)). Take into account that the d in the paper starts at 1 and we start at 0 so we add a +1 to diag_idx
@@ -523,7 +523,7 @@ typename PermutohedralLattice<P>::VecP PermutohedralLattice<P>::compute_vertex_p
 {
     VecHi vKey = VecHi::Zero();
     vKey.template head<3>() = key;
-    vKey[pos_dim] = -key.template sum();
+    vKey[pos_dim] = -key.sum();
 
     VecP new_cell_center = (m_Einv * vKey.template cast<Scalar>());
     if ( m_scale_positions )

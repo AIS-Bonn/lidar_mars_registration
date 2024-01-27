@@ -422,6 +422,6 @@ Eigen::Vector3i MarsMapBase<T>::getOriginCellShift( const Sophus::SE3d & map_pos
 
 
 //template class MarsMapBase<DenseVoxelGrid>;
-template class MarsMapBase<SparseVoxelGrid>;
-template class MarsMapBase<BlockSparseVoxelGrid>;
-template class MarsMapBase<Lattice>;
+template struct MarsMapBase<SparseVoxelGrid>;
+template struct MarsMapBase<BlockSparseVoxelGrid>;
+template struct MarsMapBase<Lattice>;

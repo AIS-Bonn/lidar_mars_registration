@@ -494,8 +494,8 @@ bool DenseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const LevelIn
 
     cellPtrs.reserve(27);
 
-    constexpr int min_cell = -(m_map_params.NUM_CELLS>>1);
-    constexpr int max_cell = (m_map_params.NUM_CELLS>>1)-1;
+    constexpr int min_cell = -(MapParameters::NUM_CELLS>>1);
+    constexpr int max_cell = (MapParameters::NUM_CELLS>>1)-1;
 
     const Eigen::Vector3i search_idx_vec = m_map_params.toCellIndexVector( pt_s, search_lvl );
     const auto & map_level = m_maps_surfel_info[search_lvl];

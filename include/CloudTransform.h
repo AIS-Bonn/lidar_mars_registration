@@ -233,6 +233,8 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
     int64_t first_imu_ns = imu_msgs.cbegin()->first;
     int64_t last_imu_ns = imu_msgs.crbegin()->first;
 
+    //LOG(1) << "imu("<<imu_msgs.size()<<" times: " << first_imu_ns << " last: " << last_imu_ns << " scan: " << cur_scan_ns << " last: " << last_scan_ns << " first<scan? " << (first_imu_ns < cur_scan_ns) << " last<scan? " << (last_imu_ns < cur_scan_ns) << " Last: first<scan? " << (first_imu_ns < last_scan_ns) << " last<scan? " << (last_imu_ns < last_scan_ns) ;
+
     for ( const std::pair<const int64_t, sensor_msgs::Imu> & it : imu_msgs )
     {
         const int64_t & imu_msg_ts = it.first;
@@ -251,6 +253,10 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
         LOG(WARNING) << "OriComp: First imu is older than last scan: " << first_imu_ns << " < " << last_scan_ns << " skipping and no compensation done.";
         return invalid_quaternion;
     }
+
+    //LOG(1) << "After start: imu("<<imu_msgs.size()<<" times: " << first_imu_ns << " last: " << last_imu_ns << " scan: " << cur_scan_ns << " last: " << last_scan_ns << " first<scan? " << (first_imu_ns < cur_scan_ns) << " last<scan? " << (last_imu_ns < cur_scan_ns) << " Last: first<scan? " << (first_imu_ns < last_scan_ns) << " last<scan? " << (last_imu_ns < last_scan_ns) ;
+
+
     Eigen::Matrix3Xf & pts = cloud->m_points;
     const Eigen::VectorXi & pt_times_ns = times;
 
@@ -290,6 +296,7 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
                 cur_estim = prev_estim * Sophus::SO3d::exp( TimeConversion::to_s(cur_imu_ns - prev_imu_ns) * get_gyr_from_msg ( msg ));
             else
                 cur_estim = ori_from_imu_msg ( msg );
+            //LOG(1) << "estim: " << cur_estim.params().transpose()<< " prev: " << prev_estim.params().transpose() <<  " at t: " << cur_imu_ns  << " ( " << msg.header.stamp.toNSec() << " ) p: " << prev_imu_ns  << " d: " << std::distance(bit,nit);
             const Sophus::SO3d cur_estim_lidar = cur_estim * q_lidar_imu.inverse();
             const Eigen::Vector3d log_vec = (prev_estim_lidar.inverse()*cur_estim_lidar).log();
             oris[cur_imu_ns] = {cur_estim_lidar,log_vec};
@@ -374,6 +381,7 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
     //if constexpr ( print_info )
     //LOG(1) << "orientation comp took: " << watch.getTime() << " i: " << imu_msgs.size() << " o: " << oris.size() << " s: " << num_slerped;
     const Sophus::SO3d rel_ori = oris.empty() ? invalid_quaternion : oris.cbegin()->second.first.inverse();
+    //LOG(1) << "rel ori: " << rel_ori.params().transpose() << " empty? " << oris.empty() << " ref: " << ref_ori_lidar.params().transpose() << " gyro? " << use_gyro_directly;
     return rel_ori;
 }
 

@@ -41,7 +41,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "MarsFwdDec.h"
 #include "MarsPointTypes.h"
 
-class SceneAssociationsVec;
+struct SceneAssociationsVec;
 typedef std::shared_ptr<SceneAssociationsVec> SceneAssociationsVecPtr;
 
 class MarsSplineRegistration

@@ -65,7 +65,7 @@ SurfelInfoVector BlockSparseVoxelGrid::iterate() const
         for ( const auto & block_volume : m_maps[lvlIdx] )
         {
             const BlockType & block = block_volume.second;
-            for ( const auto it : block )
+            for ( const auto & it : block )
             {
                 const CellType & cell = it.second;
 
@@ -765,15 +765,15 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
     cellPtrs.reserve(27);
 
     if ( neighbors > 1 ) LOG(FATAL) <<"Neighbors only implemented for 1 in every direction.";
-    if ( m_map_params.block_size <= 1 ) LOG(FATAL) << "block size should be larger than: " << m_map_params.block_size;
-    if ( m_map_params.block_size <= 1 ) LOG(FATAL) << "block size should be larger than: " << m_map_params.block_size;
+    if ( MapParameters::block_size <= 1 ) LOG(FATAL) << "block size should be larger than: " << MapParameters::block_size;
+    if ( MapParameters::block_size <= 1 ) LOG(FATAL) << "block size should be larger than: " << MapParameters::block_size;
 
-    constexpr int min_cell = -(m_map_params.NUM_CELLS>>1);
-    constexpr int max_cell = (m_map_params.NUM_CELLS>>1)-1;
+    constexpr int min_cell = -(MapParameters::NUM_CELLS>>1);
+    constexpr int max_cell = (MapParameters::NUM_CELLS>>1)-1;
     constexpr int num_blocks_per_side_x = 1;
-    constexpr int num_blocks_per_side_y = m_map_params.block_size;
-    constexpr int num_blocks_per_side_z = m_map_params.block_size * m_map_params.block_size;
-    constexpr int block_size_m1 = m_map_params.block_size-1;
+    constexpr int num_blocks_per_side_y = MapParameters::block_size;
+    constexpr int num_blocks_per_side_z = MapParameters::block_size * MapParameters::block_size;
+    constexpr int block_size_m1 = MapParameters::block_size-1;
 
     const auto & map_level = m_maps_surfel_info[search_lvl];
 
@@ -798,9 +798,9 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
     const int block_idx_inside_vec_pos_neighbors_y = block_idx_inside_vec.y()+len_pos_neighbors_y;
     const int block_idx_inside_vec_pos_neighbors_x = block_idx_inside_vec.x()+len_pos_neighbors_x;
 
-    const int pos_outside_z = block_idx_inside_vec_pos_neighbors_z >= m_map_params.block_size ? +1 : 0 ;
-    const int pos_outside_y = block_idx_inside_vec_pos_neighbors_y >= m_map_params.block_size ? +1 : 0 ;
-    const int pos_outside_x = block_idx_inside_vec_pos_neighbors_x >= m_map_params.block_size ? +1 : 0 ;
+    const int pos_outside_z = block_idx_inside_vec_pos_neighbors_z >= MapParameters::block_size ? +1 : 0 ;
+    const int pos_outside_y = block_idx_inside_vec_pos_neighbors_y >= MapParameters::block_size ? +1 : 0 ;
+    const int pos_outside_x = block_idx_inside_vec_pos_neighbors_x >= MapParameters::block_size ? +1 : 0 ;
 
     int pos_inside_neighbors_z = 0;
     int pos_inside_neighbors_y = 0;
@@ -821,7 +821,7 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
         else
         {
             new_block_inside_idx_z = 0;
-            pos_inside_neighbors_z = block_idx_inside_vec_pos_neighbors_z - m_map_params.block_size; // left outmost point
+            pos_inside_neighbors_z = block_idx_inside_vec_pos_neighbors_z - MapParameters::block_size; // left outmost point
         }
 
         //LOG(1) << "nz: " << pos_outside_z << " iz: " << iz << " nbi: " << new_block_inside_idx_z << " pin: " << pos_inside_neighbors_z;
@@ -836,7 +836,7 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
             else
             {
                 new_block_inside_idx_y = 0;
-                pos_inside_neighbors_y = block_idx_inside_vec_pos_neighbors_y - m_map_params.block_size; // left outmost point
+                pos_inside_neighbors_y = block_idx_inside_vec_pos_neighbors_y - MapParameters::block_size; // left outmost point
             }
 
             //LOG(1) << "ny: " << pos_outside_y << " iy: " << iy << " nbi: " << new_block_inside_idx_y  << " pin: " << pos_inside_neighbors_y;
@@ -861,7 +861,7 @@ bool BlockSparseVoxelGrid::getSensorCell ( const Eigen::Vector3f & pt_s, const L
                     else
                     {
                         new_block_inside_idx_x = 0; // left outmost point
-                        pos_inside_neighbors_x = block_idx_inside_vec_pos_neighbors_x - m_map_params.block_size;
+                        pos_inside_neighbors_x = block_idx_inside_vec_pos_neighbors_x - MapParameters::block_size;
                     }
 
                     //LOG(1) << "nx: " << pos_outside_x << " ix: " << ix << " nbi: " << new_block_inside_idx_x << " pin: " << pos_inside_neighbors_x << " nbiv: " << new_block_idx_vec.transpose() << " nbii: " << Eigen::Vector3i(new_block_inside_idx_x,new_block_inside_idx_y,new_block_inside_idx_z).transpose();

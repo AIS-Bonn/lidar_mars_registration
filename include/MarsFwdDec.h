@@ -63,7 +63,7 @@ typedef LatticeMarsMap MarsMap;
 typedef MarsMap MarsMapType;
 typedef std::shared_ptr<MarsMapType> MarsMapTypePtr;
 
-class MarsMapWindow;
+struct MarsMapWindow;
 typedef std::shared_ptr<MarsMapWindow> MarsMapWindowPtr;
 
 #define OPT_THREAD_NUM 3
@@ -101,7 +101,7 @@ namespace TimeConversion
 namespace basalt
 {
     template<int _N, typename _Scalar>
-    struct Se3Spline;
+    class Se3Spline;
 }
 typedef basalt::Se3Spline<MarsSplineDegree,double> MarsSplineType;
 typedef basalt::Se3Spline<1,double> MarsConstraintSplineType;

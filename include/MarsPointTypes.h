@@ -100,30 +100,30 @@ struct MarsSemanticPointCloud : MarsPointCloudBase
 
 template<typename T>
 constexpr bool has_semantics_v = false;
-template<>
+template<> inline
 constexpr bool has_semantics_v<MarsSemanticPointCloud> = true;
 
 template<typename T>
 constexpr bool has_scan_id_v = false;
-template<>
+template<> inline
 constexpr bool has_scan_id_v<MarsPointCloudBase> = true;
 
 template<typename T>
 constexpr bool has_intensity_v = false;
-template<>
+template<> inline
 constexpr bool has_intensity_v<MarsPointCloudBase> = true;
 
 template<typename T>
 constexpr bool has_color_v = false;
-template<>
+template<> inline
 constexpr bool has_color_v<MarsColorPointCloud> = true;
 
 template<typename T>
 constexpr bool is_mars_cloud_v = false;
-template<>
+template<> inline
 constexpr bool is_mars_cloud_v<MarsPointCloudBase> = true;
-template<>
+template<> inline
 constexpr bool is_mars_cloud_v<MarsColorPointCloud> = true;
-template<>
+template<> inline
 constexpr bool is_mars_cloud_v<MarsSemanticPointCloud> = true;
 
