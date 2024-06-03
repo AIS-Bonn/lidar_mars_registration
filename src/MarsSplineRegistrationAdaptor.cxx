@@ -663,7 +663,11 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     }
 
     m_cur_pose_baselink_sensor = transformToSophus(transform_baselink_sensor.transform); //Sophus::SE3d ( cur_pose_baselink_sensor_eigen.matrix() );
-    //LOG(1) << "baselink_sensor " << m_cur_pose_baselink_sensor.params().transpose() << " R:\n" << m_cur_pose_baselink_sensor.so3().matrix();
+    static bool once = true;
+    if ( once ){
+        LOG(INFO) << "baselink_sensor " << m_cur_pose_baselink_sensor.params().transpose() << " R:\n" << m_cur_pose_baselink_sensor.so3().matrix();
+        once = false;
+    }
 
     static ros::Time last_stamp = ros::Time().fromNSec(inputCloud->header.stamp.toNSec()+m_scan_time_offset_ns); // first time without the front offset
     MarsMapPointCloud::Ptr sceneCloud = MarsMapPointCloud::create();
