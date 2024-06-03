@@ -410,7 +410,10 @@ Sophus::SE3d MarsSplineRegistrator::register_cloud ( MarsMapPointCloudPtr sceneC
             const Sophus::Vector3d trans_error = interpolated_spline->positionResidual(t,ref_pose.translation());
             const Sophus::Vector3d rot_error = interpolated_spline->orientationResidual(t,ref_pose.so3());
             if ( rot_error.norm() > 0.1 || trans_error.norm() > 0.05 )
-              LOG(WARNING) << "PreInterp["<<cloudIdx<<"]=["<<interpolated_spline_pose.params().transpose()<<"] diff: " << rot_error.transpose() << " (| "<< rot_error.norm()<< " |)" << trans_error.transpose() << " (|"<< trans_error.norm()<<" |)";
+            {
+                 LOG(WARNING) << "PreInterp["<<cloudIdx<<"]i=["<<interpolated_spline_pose.params().transpose()<<"] diffR: " << rot_error.transpose() << " (| "<< rot_error.norm()<< " |)";
+                 LOG(WARNING) << "PreInterp["<<cloudIdx<<"]r=["<<ref_pose.params().transpose()<<"] diffT: "<< trans_error.transpose() << " (|"<< trans_error.norm()<<" |)";
+            }
         }
         m_trajectory_spline = interpolated_spline;
     }

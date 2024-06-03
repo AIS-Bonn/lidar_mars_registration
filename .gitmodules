@@ -16,3 +16,9 @@
 [submodule "deps/loguru"]
 	path = deps/loguru
 	url = https://github.com/RaduAlexandru/loguru.git
+[submodule "deps/easy_pbr"]
+	path = deps/easy_pbr
+	url = git@github.com:JanQuenzel/easy_pbr.git
+[submodule "deps/eigen"]
+	path = deps/eigen
+	url = https://gitlab.com/libeigen/eigen.git

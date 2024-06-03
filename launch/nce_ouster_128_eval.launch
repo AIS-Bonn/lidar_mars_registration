@@ -6,7 +6,7 @@
   <node pkg="tf" type="static_transform_publisher" name="base_imu_broadcaster" args=" 0 0 0 0 0 0 base_link imu_link 100 "/>
   <node pkg="tf" type="static_transform_publisher" name="imu_sensor_broadcaster" args=" 0 0 0 0 0 0 imu_link imu_sensor_frame 100 "/>
   <!--<node pkg="tf" type="static_transform_publisher" name="imu_os_broadcaster" args=" -0.037 -0.008 -0.062 0 1 0 0 imu_link os_lidar 100 "/>-->
-  <node pkg="tf" type="static_transform_publisher" name="imu_os_broadcaster" args=" -0.037 -0.008 -0.026 1 0 0 0 imu_link os_sensor 100 "/>
+  <node pkg="tf" type="static_transform_publisher" name="imu_os_broadcaster" args="-0.037 -0.0084 -0.02558 1 0 0 0 imu_link os_sensor 100 "/>
 
   <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v INFO " output="screen">
      <param name="config_file_rel" type="str" value="./config/newer_college_ext.cfg" />

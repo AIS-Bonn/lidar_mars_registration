@@ -18,7 +18,7 @@ execute_process (
     OUTPUT_VARIABLE EASYPBR_SRC_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-message("EASYPPBR source is ", ${EASYPBR_SRC_PATH})
+message("EASYPPBR source is " ${EASYPBR_SRC_PATH} )
 
 #DEBUG
 # set(EASYPBR_SRC_PATH "/media/rosu/Data/phd/c_ws/src/easy_pbr")
@@ -46,10 +46,10 @@ set( EASYPBR_INCLUDE_DIR ${EASYPBR_SRC_PATH}/extern ${EASYPBR_CORE_INCLUDE_DIR} 
 
 
 find_library(EASYPBR_LIBRARY
-    NAMES libeasypbr_cpp.so
+    NAMES libeasypbr_cpp.so easypbr.cpython-38-x86_64-linux-gnu.so
     HINTS ${EASYPBR_SRC_PATH}
     DOC "The EasyPBR lib directory"
     NO_DEFAULT_PATH)
-# message("--------------------EASYPPBR lib dir is at ", ${EASYPBR_LIBRARY})
+message("--------------------EASYPPBR lib dir is at " ${EASYPBR_LIBRARY})
 
 add_definitions( -DDEFAULT_CONFIG="${EASYPBR_SRC_PATH}/config/default_params.cfg" )

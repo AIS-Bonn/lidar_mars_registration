@@ -98,6 +98,7 @@ void BagAdaptor::init_params(const std::string config_file){
     m_fix_gps_to_baselink_tf = dyn_config["fix_gps_to_baselink_tf"];
     m_inc_mode = dyn_config["inc_mode"];
     m_store_times = dyn_config["store_times"];
+    m_stamp_at_front = dyn_config["stamp_at_front"];
     m_load_imu = dyn_config["load_imu"];
     m_load_gps = dyn_config["load_gps"];
     m_compensate_orientation = dyn_config["compensate_orientation"];
@@ -224,6 +225,12 @@ void BagAdaptor::initializeBagReader( )
         {
             m_pose_lidar_imu.so3().setQuaternion(tfq.normalized());
             m_pose_lidar_imu.translation() << tf.transform.translation.x, tf.transform.translation.y, tf.transform.translation.z;
+        }
+        else
+        {
+            LOG(WARNING) << "tf not found, setting drz imu to lidar transform.";
+            m_pose_lidar_imu.so3().setQuaternion(Eigen::Quaterniond(0.0, 1.0, -1.0, 0.0).normalized());
+            m_pose_lidar_imu.translation() << 0.031775, 0.0832276, -0.217189;
         }
 
         if ( m_bag_reader->hasNonStatic() )
@@ -379,7 +386,8 @@ CloudPtr BagAdaptor::cloudMsgToCloud( sensor_msgs::PointCloud2::ConstPtr cloudMs
     {
         ZoneScopedN("CopyMsgToCloud");
 #ifdef USE_EASY_PBR
-        copyCloud ( cloudMsg, cloud, ( m_compensate_orientation ? & times : nullptr) );
+        copyCloud ( cloudMsg, cloud, &times, m_stamp_at_front && m_compensate_orientation );
+        cloud->T = times;
 #else
         copyCloud<Cloud> ( cloudMsg, cloud, ( m_compensate_orientation ? & times : nullptr) );
 #endif

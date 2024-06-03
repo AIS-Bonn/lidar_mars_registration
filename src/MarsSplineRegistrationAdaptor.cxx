@@ -373,18 +373,32 @@ void MarsSplineRegistrationAdaptor::gps_msgs ( const std::shared_ptr<nav_msgs::O
 
 void MarsSplineRegistrationAdaptor::cloud_msg ( CloudPtr mesh )
 {
-    ImuMsgsPtr imu_msgs;
+    const int64_t front_stamp_offset_ns = (m_stamp_at_front && mesh->T.size() > 0) ? mesh->T.maxCoeff() : 0 ;
+    static int64_t last_cloud_stamp = mesh->t + m_scan_time_offset_ns + front_stamp_offset_ns;
+    const int64_t current_cloud_stamp = mesh->t + m_scan_time_offset_ns + front_stamp_offset_ns;
+    const int64_t dt = TimeConversion::to_ns(1./(m_num_scans_per_second));
+    const int64_t last_cloud_stamp_dt = last_cloud_stamp + 1.05*dt;
+    //LOG(1) << "lcs: " << last_cloud_stamp << " dt: " << dt << " lcs+dt: " << last_cloud_stamp_dt;
+    if ( last_cloud_stamp_dt < current_cloud_stamp ) // for orientation compensation of os_lidars
+    {
+       last_cloud_stamp = current_cloud_stamp - dt;
+    }
+    //LOG(1) << "last: " << last_cloud_stamp << " cur: " << current_cloud_stamp << " beg: " << mesh->t << " front_off: " << front_stamp_offset_ns;
+
+    if constexpr ( false )
     {
         std::unique_lock<std::mutex> lock ( imuMsgsMutex );
-        imu_msgs = m_imu_msgs;
-        m_imu_msgs = nullptr;
+        if ( m_imu_msgs )
+        {
+        for ( const auto & a : *m_imu_msgs )
+            LOG(1) << a.first << " " << a.second.header.stamp.toNSec() << " " << (a.second.header.stamp.toNSec() < last_cloud_stamp) << " " << (a.second.header.stamp.toNSec() < current_cloud_stamp) ;
+        LOG(1) << "imu size: " << m_imu_msgs->size();
+        }
     }
-    GpsMsgsPtr gps_msgs;
-    {
-        std::unique_lock<std::mutex> lock ( gpsMsgsMutex );
-        gps_msgs = m_gps_msgs;
-        m_gps_msgs = nullptr;
-    }
+
+    ImuMsgsPtr imu_msgs = getCurrentMsgs<ImuMsgs,ImuMsgsPtr>( m_imu_msgs, imuMsgsMutex, last_cloud_stamp, current_cloud_stamp );
+    GpsMsgsPtr gps_msgs = getCurrentMsgs<GpsMsgs,GpsMsgsPtr>( m_gps_msgs, gpsMsgsMutex, last_cloud_stamp, current_cloud_stamp );
+
     register_cloud (mesh, imu_msgs, gps_msgs );
 }
 
@@ -398,7 +412,7 @@ void MarsSplineRegistrationAdaptor::convertToMapCloud( const std::shared_ptr<Inp
 {
     if ( ! inputCloud ) LOG(FATAL) << "empty inputCloud?";
     const int num_pts = evalCloudType(inputCloud->size(),inputCloud->V.rows());
-    const bool has_time = evalCloudType(inputCloud->m_scan_time.size(),0) > 0;
+    const bool has_time = evalCloudType(inputCloud->m_scan_time.size(),inputCloud->T.size()) > 0;
     const bool has_intensity = evalCloudType(inputCloud->m_intensity.size(),inputCloud->I.rows()) > 0;
     const bool has_reflectivity = evalCloudType(inputCloud->m_reflectivity.size(),inputCloud->C.rows()) > 0;
     const bool has_semantic = evalSemanticType(inputCloud->size(),inputCloud->S_pred.rows()) > 0;
@@ -437,7 +451,7 @@ void MarsSplineRegistrationAdaptor::convertToMapCloud( const std::shared_ptr<Inp
         const int idx = outputCloud->size();
         outputCloud->addPoint(v);
 
-        if ( has_time ) scan_time(idx) = evalCloudType( inputCloud->m_scan_time(i), 0 );
+        if ( has_time ) scan_time(idx) = evalCloudType( inputCloud->m_scan_time(i), inputCloud->T.row(i)(0) );
         if ( has_intensity ) intensity(idx) = evalCloudType( inputCloud->m_intensity(i), inputCloud->I.row(i)(0) );
         if ( has_reflectivity ) reflectivity(idx) = evalCloudType( inputCloud->m_reflectivity(i), inputCloud->C.row(i)(0)*65535 );
 
@@ -647,7 +661,7 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     }
 
     m_cur_pose_baselink_sensor = transformToSophus(transform_baselink_sensor.transform); //Sophus::SE3d ( cur_pose_baselink_sensor_eigen.matrix() );
-    //LOG(1) << "baselink_sensor " << m_cur_pose_baselink_sensor.params().transpose();
+    //LOG(1) << "baselink_sensor " << m_cur_pose_baselink_sensor.params().transpose() << " R:\n" << m_cur_pose_baselink_sensor.so3().matrix();
 
     static ros::Time last_stamp = ros::Time().fromNSec(inputCloud->header.stamp.toNSec()+m_scan_time_offset_ns); // first time without the front offset
     MarsMapPointCloud::Ptr sceneCloud = MarsMapPointCloud::create();
@@ -662,11 +676,14 @@ void MarsSplineRegistrationAdaptor::register_cloud_ros ( const sensor_msgs::Poin
     input_stamp = ros::Time().fromNSec(sceneCloud->m_stamp+m_scan_time_offset_ns); // includes the front offset !
     if ( m_compensate_orientation && imu_msgs && input_stamp > last_stamp )
     {
-        rotation_prior = compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), *imu_msgs, m_cur_pose_baselink_sensor.so3(), m_min_range*m_min_range, m_use_gyro_directly );
+        rotation_prior = compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), *imu_msgs, m_cur_pose_baselink_sensor.so3(), m_min_range*m_min_range, m_use_gyro_directly, false ); // m_stamp_at_front unnecessary, as it has been copied to match at end
         if ( rotation_prior.params().squaredNorm() > 0.1 ) // check that it is not given as invalid quat.
             rotation_prior_valid = true;
         //LOG(1) << "rot prior: " << rotation_prior.params().transpose();
     }
+//    else {
+//        LOG(1) << "not compensating: " << m_compensate_orientation << " " << (imu_msgs != nullptr) << " "<< input_stamp.toNSec() << " " << last_stamp.toNSec() << " " << (input_stamp > last_stamp);
+//    }
     }
 
     LOG(1) << "sceneCloud: " << sceneCloud->size() << " id:" << m_scan_id << " gps: " << (gps_msgs==nullptr?0:gps_msgs->size()) << " imu: " <<(imu_msgs==nullptr?0:imu_msgs->size());
@@ -828,6 +845,25 @@ void MarsSplineRegistrationAdaptor::register_cloud ( CloudPtr mesh, const ImuMsg
 
     MarsMapPointCloud::Ptr sceneCloud = MarsMapPointCloud::create();
     convertToMapCloud<Cloud,MarsMapPointCloud>(mesh, sceneCloud, m_scan_id);
+    if ( m_stamp_at_front )
+    {
+        sceneCloud->m_stamp += sceneCloud->m_scan_time.head(sceneCloud->size()).maxCoeff();
+    }
+    // from here on, m_stamp_at_front is not important anymore!
+
+    Sophus::SO3d rotation_prior;
+    bool rotation_prior_valid = false;
+    static ros::Time last_stamp = ros::Time().fromNSec(sceneCloud->m_stamp+m_scan_time_offset_ns); // first time without the front offset
+    const ros::Time input_stamp = ros::Time().fromNSec(sceneCloud->m_stamp+m_scan_time_offset_ns); // includes the front offset !
+    if ( m_compensate_orientation && imu_msgs  && input_stamp > last_stamp )
+    {
+        rotation_prior = compensateOrientation ( sceneCloud, sceneCloud->m_scan_time, input_stamp.toNSec(), last_stamp.toNSec(), *imu_msgs, m_cur_pose_baselink_sensor.so3(), m_min_range*m_min_range, m_use_gyro_directly );
+        if ( rotation_prior.params().squaredNorm() > 0.1 ) // check that it is not given as invalid quat.
+            rotation_prior_valid = true;
+        //LOG(1) << "rot prior: " << rotation_prior.params().transpose();
+    }
+    //rotation_prior = rotation_prior.inverse();
+    //rotation_prior_valid = false;
 
     LOG(1) << "sceneCloud: " << sceneCloud->size() << " id:" << m_scan_id << " gps: " << (gps_msgs==nullptr?0:gps_msgs->size()) << " imu: " <<(imu_msgs==nullptr?0:imu_msgs->size());
 
@@ -862,6 +898,7 @@ void MarsSplineRegistrationAdaptor::register_cloud ( CloudPtr mesh, const ImuMsg
 
     m_marsRegistrator->setCurPose ( cur_pose_world_sensor, false );
     m_marsRegistrator->setCurPos ( cur_pose_vo_world_sensor, cur_pose_vo_valid );
+    m_marsRegistrator->setCurRot ( rotation_prior, rotation_prior_valid );
     const Sophus::SE3d pose_map_sensor = m_marsRegistrator->register_cloud ( sceneCloud );
     const Sophus::SE3d pose_world_map = m_marsRegistrator->getMapPose();
 
@@ -1020,6 +1057,7 @@ void MarsSplineRegistrationAdaptor::register_cloud ( CloudPtr mesh, const ImuMsg
     showPoses( cur_pose_first_sensor, interp_pose_map_sensor, sceneCloud->m_stamp );
 #endif
     ++m_scan_id;
+    last_stamp = input_stamp;
 }
 
 void MarsSplineRegistrationAdaptor::triggerVis ( MarsMapPointCloud::Ptr sceneCloud )

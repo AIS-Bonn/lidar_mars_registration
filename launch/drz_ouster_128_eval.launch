@@ -7,7 +7,9 @@
   <node pkg="tf" type="static_transform_publisher" name="baselink_gps_broadcaster" args="0 0 0  0 0 0 base_link base_link_gps 100" />
   <node pkg="tf" type="static_transform_publisher" name="baselink_field_broadcaster" args="0 0 0  0 0 0 base_link_gps field 100" />
 
-  <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v INFO " output="screen" />
+  <node name="lidar_mars_registration" pkg="lidar_mars_registration" type="lidar_mars_registration_node" args="-v INFO " output="screen">
+    <param name="config_file_rel" type="str" value="./config/drz_benchmark_10hz.cfg" />
+  </node>
 
 </launch>
 

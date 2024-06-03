@@ -73,34 +73,54 @@ inline Eigen::Vector3d get_gyr_from_msg ( const sensor_msgs::Imu & msg )
 
 static Sophus::SO3d compensateOrientation( MeshCloudPtr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
 {
-    //constexpr bool print_info = false;
-    if ( last_scan_ns == 0 ) return;
-    if ( imu_msgs.size() < 2 ) return;
+    constexpr bool print_info = false;
+    static Sophus::SO3d invalid_quaternion;
+    if ( invalid_quaternion.data()[3] > 0.1 ) invalid_quaternion.data()[3] = 0;
+
+    if ( last_scan_ns == 0 ) return invalid_quaternion;
+    if ( imu_msgs.size() < 2 ) return invalid_quaternion;
     //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation");
     //StopWatch watch;
     int64_t first_imu_ns = imu_msgs.cbegin()->first;
     int64_t last_imu_ns = imu_msgs.crbegin()->first;
+
+    const Eigen::VectorXi & pt_times_ns = times;
+    const int num_pts = cloud->V.rows();
+    const int num_times = pt_times_ns.rows();
+    const bool t_cont = (pt_times_ns.head(num_pts-1).array() <= pt_times_ns.segment(1,num_pts-1).array()).all();
+    const int min_time_ns = pt_times_ns.head(num_pts).minCoeff();
+    const int max_time_ns = pt_times_ns.head(num_pts).maxCoeff();
+
+    const int64_t offset = stamp_at_beginning ? 0 : -max_time_ns;  // max_time_ns is at cloud_stamp => go to first time.
+    const int64_t cur_scan_beg_ns = cur_scan_ns + offset;
+    const int64_t cur_scan_end_ns = cur_scan_ns + (stamp_at_beginning ? max_time_ns : 0);
+
+    if constexpr ( print_info )
+    LOG(1) << "min: " << min_time_ns << " max: " << max_time_ns << " num: " << pt_times_ns.size() << " " << num_times << " off: " << offset << " beg: " << cur_scan_beg_ns << " end: " << cur_scan_end_ns << " q: " << q_lidar_imu.params().transpose();
+
+    if ( first_imu_ns > cur_scan_end_ns )
+    {
+        LOG(WARNING) << "all imu timestamps are after the scan ended! first imu: " << first_imu_ns << " scan end: " << cur_scan_end_ns;
+        return invalid_quaternion;
+    }
+    if ( last_imu_ns < cur_scan_beg_ns )
+    {
+        LOG(WARNING) << "all imu timestamps are before the scan began! last imu: " << last_imu_ns << " scan beg: " << cur_scan_beg_ns;
+        return invalid_quaternion;
+    }
 
     for ( const std::pair<const int64_t, sensor_msgs::Imu> & it : imu_msgs )
     {
         const int64_t & imu_msg_ts = it.first;
         if ( imu_msg_ts < last_scan_ns )
             first_imu_ns = imu_msg_ts;
-        if ( imu_msg_ts < cur_scan_ns )
+        if ( imu_msg_ts < cur_scan_end_ns )
             last_imu_ns = imu_msg_ts;
     }
     const int64_t ref_imu_ns = last_imu_ns; // since cur_scan_ns is at the end of the scan.
-    const bool firstOneIsOlder = first_imu_ns < last_scan_ns;
-    // if first msg is older than last time: it should only be used partially.
-    // TODO: handle this correctly!
 
-    const Eigen::VectorXi & pt_times_ns = times;
-
-    const int num_pts = cloud->V.rows();
-    const int num_times = pt_times_ns.rows();
-    const bool t_cont = (pt_times_ns.head(num_pts-1).array() <= pt_times_ns.segment(1,num_pts-1).array()).all();
-    const int min_time_ns = pt_times_ns.head(num_pts).minCoeff();
-    const int max_time_ns = pt_times_ns.head(num_pts).maxCoeff();
+    if constexpr ( print_info )
+    LOG(1) << "After start: imu "<<imu_msgs.size()<<" times: " << first_imu_ns << " last: " << last_imu_ns << " scan: " << cur_scan_end_ns << " last: " << last_scan_ns << " first<scanBeg? " << (first_imu_ns < cur_scan_beg_ns) << " last<scanEnd? " << (last_imu_ns < cur_scan_end_ns) << " Last: first<lastBeg? " << (first_imu_ns < last_scan_ns) << " last<scanEnd? " << (last_imu_ns < last_scan_ns);
 
     bool use_gyro_directly = should_use_gyro_directly;
     if ( !should_use_gyro_directly && !is_imu_ori_valid(imu_msgs.find(ref_imu_ns)->second) )
@@ -115,7 +135,7 @@ static Sophus::SO3d compensateOrientation( MeshCloudPtr cloud, const Eigen::Vect
     if ( bit == imu_msgs.end() || lit == imu_msgs.end() )
     {
         //LOG(WARNING) << "could not find iterators. t1: " << first_imu_ns << " tn: " << last_imu_ns;
-        return;
+        return Sophus::SO3d();
     }
     const auto nit = std::next(lit);
     {
@@ -141,14 +161,22 @@ static Sophus::SO3d compensateOrientation( MeshCloudPtr cloud, const Eigen::Vect
         }
     }
 
+    // move towards last (=Id)
     const Sophus::SO3d ref_ori_lidar = oris.crbegin()->second.first.inverse(); // q_lidar_imu * q_imu0_world = q_lidar0_world
     for ( std::pair<const int64_t, std::pair<Sophus::SO3d,Eigen::Vector3d>> & it : oris )
     {
         it.second.first = ref_ori_lidar * it.second.first; // premultiply ref_ori to get relative to last one.
     }
-    auto it_cont = oris.cbegin();
 
-    const int64_t offset = stamp_at_beginning ? 0 : -max_time_ns;  // max_time_ns is at cloud_stamp => go to first time.
+    // compute logs now
+    for ( auto it_prev = oris.begin(), it = std::next(oris.begin()); it != oris.end(); ++it)
+    {
+        it_prev->second.second = (it_prev->second.first.inverse()*it->second.first).log();
+        it_prev = it;
+    }
+    oris.rbegin()->second.second.setZero();
+
+    auto it_cont = oris.cbegin();
 
     Sophus::SO3d diff_ori_lidar;
     //int num_slerped = 0;
@@ -222,10 +250,10 @@ static Sophus::SO3d compensateOrientation( MeshCloudPtr cloud, const Eigen::Vect
 
 static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const Eigen::VectorXi & times, const int64_t & cur_scan_ns, const int64_t & last_scan_ns, const std::map<int64_t,sensor_msgs::Imu> & imu_msgs, const Sophus::SO3d & q_lidar_imu, const float & min_range2 = 0.1, const bool & should_use_gyro_directly = false, const bool & stamp_at_beginning = false )
 {
+    constexpr bool print_info = false;
     static Sophus::SO3d invalid_quaternion;
     if ( invalid_quaternion.data()[3] > 0.1 ) invalid_quaternion.data()[3] = 0;
 
-    //constexpr bool print_info = false;
     if ( last_scan_ns == 0 ) return invalid_quaternion;
     if ( imu_msgs.size() < 2 ) return invalid_quaternion;
     //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation");
@@ -235,41 +263,57 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
 
     //LOG(1) << "imu("<<imu_msgs.size()<<" times: " << first_imu_ns << " last: " << last_imu_ns << " scan: " << cur_scan_ns << " last: " << last_scan_ns << " first<scan? " << (first_imu_ns < cur_scan_ns) << " last<scan? " << (last_imu_ns < cur_scan_ns) << " Last: first<scan? " << (first_imu_ns < last_scan_ns) << " last<scan? " << (last_imu_ns < last_scan_ns) ;
 
-    for ( const std::pair<const int64_t, sensor_msgs::Imu> & it : imu_msgs )
-    {
-        const int64_t & imu_msg_ts = it.first;
-        if ( imu_msg_ts < last_scan_ns )
-            first_imu_ns = imu_msg_ts;
-        if ( imu_msg_ts < cur_scan_ns )
-            last_imu_ns = imu_msg_ts;
-    }
-    const int64_t ref_imu_ns = last_imu_ns; // since cur_scan_ns is at the end of the scan.
-    const bool firstOneIsOlder = first_imu_ns < last_scan_ns;
-    // if first msg is older than last time: it should only be used partially.
-    // TODO: handle this correctly!
-
-    if ( firstOneIsOlder )
-    {
-        LOG(WARNING) << "OriComp: First imu is older than last scan: " << first_imu_ns << " < " << last_scan_ns << " skipping and no compensation done.";
-        return invalid_quaternion;
-    }
-
-    //LOG(1) << "After start: imu("<<imu_msgs.size()<<" times: " << first_imu_ns << " last: " << last_imu_ns << " scan: " << cur_scan_ns << " last: " << last_scan_ns << " first<scan? " << (first_imu_ns < cur_scan_ns) << " last<scan? " << (last_imu_ns < cur_scan_ns) << " Last: first<scan? " << (first_imu_ns < last_scan_ns) << " last<scan? " << (last_imu_ns < last_scan_ns) ;
-
-
     Eigen::Matrix3Xf & pts = cloud->m_points;
     const Eigen::VectorXi & pt_times_ns = times;
-
     const int num_pts = cloud->size();
     const int num_times = pt_times_ns.rows();
     const bool t_cont = (pt_times_ns.head(num_pts-1).array() <= pt_times_ns.segment(1,num_pts-1).array()).all();
     const int min_time_ns = pt_times_ns.head(num_pts).minCoeff();
     const int max_time_ns = pt_times_ns.head(num_pts).maxCoeff();
 
+    const int64_t offset = stamp_at_beginning ? 0 : -max_time_ns;  // max_time_ns is at cloud_stamp => go to first time.
+    const int64_t cur_scan_beg_ns = cur_scan_ns + offset;
+    const int64_t cur_scan_end_ns = cur_scan_ns + (stamp_at_beginning ? max_time_ns : 0);
+
+    if constexpr ( print_info )
+    LOG(1) << "min: " << min_time_ns << " max: " << max_time_ns << " num: " << pt_times_ns.size() << " " << num_times << " off: " << offset << " beg: " << cur_scan_beg_ns << " end: " << cur_scan_end_ns << " q: " << q_lidar_imu.params().transpose();
+
+    if ( first_imu_ns > cur_scan_end_ns )
+    {
+        LOG(WARNING) << "all imu timestamps are after the scan ended! first imu: " << first_imu_ns << " scan end: " << cur_scan_end_ns;
+        return invalid_quaternion;
+    }
+    if ( last_imu_ns < cur_scan_beg_ns )
+    {
+        LOG(WARNING) << "all imu timestamps are before the scan began! last imu: " << last_imu_ns << " scan beg: " << cur_scan_beg_ns;
+        return invalid_quaternion;
+    }
+
+    for ( const std::pair<const int64_t, sensor_msgs::Imu> & it : imu_msgs )
+    {
+        const int64_t & imu_msg_ts = it.first;
+        if ( imu_msg_ts < last_scan_ns )
+            first_imu_ns = imu_msg_ts;
+        if ( imu_msg_ts < cur_scan_end_ns )
+            last_imu_ns = imu_msg_ts;
+    }
+    const int64_t ref_imu_ns = last_imu_ns; // since cur_scan_ns is at the end of the scan.
+    //const bool firstOneIsOlder = first_imu_ns < last_scan_ns;
+    // if first msg is older than last time: it should only be used partially?
+    // TODO: handle this correctly!
+//    if ( firstOneIsOlder )
+//    {
+//        LOG(WARNING) << "OriComp: First imu is older than last scan: " << first_imu_ns << " < " << last_scan_ns << " skipping and no compensation done.";
+//        return invalid_quaternion;
+//    }
+
+    if constexpr ( print_info )
+    LOG(1) << "After start: imu "<<imu_msgs.size()<<" times: " << first_imu_ns << " last: " << last_imu_ns << " scan: " << cur_scan_end_ns << " last: " << last_scan_ns << " first<scanBeg? " << (first_imu_ns < cur_scan_beg_ns) << " last<scanEnd? " << (last_imu_ns < cur_scan_end_ns) << " Last: first<lastBeg? " << (first_imu_ns < last_scan_ns) << " last<scanEnd? " << (last_imu_ns < last_scan_ns) ;
+
     bool use_gyro_directly = should_use_gyro_directly;
     if ( !should_use_gyro_directly && !is_imu_ori_valid(imu_msgs.find(ref_imu_ns)->second) )
     {
-        //LOG(WARNING) << "Reference orientation is invalid, but I should not use gyro directly? I still have to!";
+        LOG(WARNING) << "Reference orientation is invalid, but I should not use gyro directly? I still have to!";
         use_gyro_directly = true;
     }
     std::map<int64_t,std::pair<Sophus::SO3d, Eigen::Vector3d>> oris;
@@ -283,7 +327,6 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
     }
     const auto nit = std::next(lit);
     {
-        //ZoneScopedN("MotionCompensation::Cloud::compensateOrientation::compute_log");
         Sophus::SO3d prev_estim;
         Sophus::SO3d prev_estim_lidar;
         int64_t prev_imu_ns = bit->first;
@@ -298,22 +341,29 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
                 cur_estim = ori_from_imu_msg ( msg );
             //LOG(1) << "estim: " << cur_estim.params().transpose()<< " prev: " << prev_estim.params().transpose() <<  " at t: " << cur_imu_ns  << " ( " << msg.header.stamp.toNSec() << " ) p: " << prev_imu_ns  << " d: " << std::distance(bit,nit);
             const Sophus::SO3d cur_estim_lidar = cur_estim * q_lidar_imu.inverse();
-            const Eigen::Vector3d log_vec = (prev_estim_lidar.inverse()*cur_estim_lidar).log();
-            oris[cur_imu_ns] = {cur_estim_lidar,log_vec};
+            oris[cur_imu_ns] = {cur_estim_lidar,Eigen::Vector3d::Zero()};
             prev_estim_lidar = cur_estim_lidar;
             prev_estim = cur_estim;
             prev_imu_ns = cur_imu_ns;
         }
     }
 
+    // move towards last (=Id)
     const Sophus::SO3d ref_ori_lidar = oris.crbegin()->second.first.inverse(); // q_lidar_imu * q_imu0_world = q_lidar0_world
     for ( std::pair<const int64_t, std::pair<Sophus::SO3d,Eigen::Vector3d>> & it : oris )
     {
         it.second.first = ref_ori_lidar * it.second.first; // premultiply ref_ori to get relative to last one.
     }
-    auto it_cont = oris.cbegin();
 
-    const int64_t offset = stamp_at_beginning ? 0 : -max_time_ns;  // max_time_ns is at cloud_stamp => go to first time.
+    // compute logs now
+    for ( auto it_prev = oris.begin(), it = std::next(oris.begin()); it != oris.end(); ++it)
+    {
+        it_prev->second.second = (it_prev->second.first.inverse()*it->second.first).log();
+        it_prev = it;
+    }
+    oris.rbegin()->second.second.setZero();
+
+    auto it_cont = oris.cbegin();
 
     Sophus::SO3f diff_ori_lidar;
     //int num_slerped = 0;
@@ -359,7 +409,6 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
                     const auto it_prev = std::prev(it_next);
                     const int64_t next_imu_ns = it_next->first;
                     const int64_t prev_imu_ns = it_prev->first;
-                    //LOG(INFO) << "idx: " << idx << " oi: " << prevOriIdx << " i: " << imu_msgs.size() << " s: " << oris.size() << " dt: " << dt<< " t: " << cur_t_ns << " o: " << oris[prevOriIdx].first << " n: " << oris[prevOriIdx+1].first << " t-o: " << (cur_t_ns - oris[prevOriIdx].first) << " n-t: " << ( oris[prevOriIdx+1].first - cur_t_ns);
                     if( cur_pt_ns == prev_imu_ns ) // no need to check for next_imu_ns, due to upper_bound
                         diff_ori_lidar = it_prev->second.first.template cast<float>();
                     else {
@@ -375,13 +424,14 @@ static Sophus::SO3d compensateOrientation( MarsMapPointCloud::Ptr cloud, const E
         }
         pts.col(idx) = diff_ori_lidar * pts.col(idx);
     }
-
-    //if ( ! oris.empty() ) { LOG(1) << "ori beg: " << oris.cbegin()->second.first.params().transpose() << " ori end: " << oris.crbegin()->second.first.params().transpose(); }
+    if constexpr ( print_info )
+    if ( ! oris.empty() ) { LOG(1) << "ori beg: " << oris.cbegin()->second.first.params().transpose() << " ori end: " << oris.crbegin()->second.first.params().transpose(); }
     //}
     //if constexpr ( print_info )
     //LOG(1) << "orientation comp took: " << watch.getTime() << " i: " << imu_msgs.size() << " o: " << oris.size() << " s: " << num_slerped;
     const Sophus::SO3d rel_ori = oris.empty() ? invalid_quaternion : oris.cbegin()->second.first.inverse();
-    //LOG(1) << "rel ori: " << rel_ori.params().transpose() << " empty? " << oris.empty() << " ref: " << ref_ori_lidar.params().transpose() << " gyro? " << use_gyro_directly;
+    if constexpr ( print_info )
+    LOG(1) << "rel ori: " << rel_ori.params().transpose() << " empty? " << oris.empty() << " ref: " << ref_ori_lidar.params().transpose() << " gyro? " << use_gyro_directly;
     return rel_ori;
 }
 

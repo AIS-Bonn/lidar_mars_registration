@@ -126,6 +126,7 @@ private:
     bool m_compensate_orientation = false;
     double m_compensate_offset = 0.;
     bool m_store_times = false;
+    bool m_stamp_at_front = false;
     bool m_inc_mode = false;
     bool m_store_compensated = false;
     std::string m_bag_file = "";
