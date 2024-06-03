@@ -373,6 +373,7 @@ void MarsSplineRegistrationAdaptor::gps_msgs ( const std::shared_ptr<nav_msgs::O
 
 void MarsSplineRegistrationAdaptor::cloud_msg ( CloudPtr mesh )
 {
+#ifdef USE_EASY_PBR
     const int64_t front_stamp_offset_ns = (m_stamp_at_front && mesh->T.size() > 0) ? mesh->T.maxCoeff() : 0 ;
     static int64_t last_cloud_stamp = mesh->t + m_scan_time_offset_ns + front_stamp_offset_ns;
     const int64_t current_cloud_stamp = mesh->t + m_scan_time_offset_ns + front_stamp_offset_ns;
@@ -400,6 +401,7 @@ void MarsSplineRegistrationAdaptor::cloud_msg ( CloudPtr mesh )
     GpsMsgsPtr gps_msgs = getCurrentMsgs<GpsMsgs,GpsMsgsPtr>( m_gps_msgs, gpsMsgsMutex, last_cloud_stamp, current_cloud_stamp );
 
     register_cloud (mesh, imu_msgs, gps_msgs );
+#endif
 }
 
 #define evalCloudType(a,b) [&]{ if constexpr( is_mars_cloud_v<InputPointCloud> ) return (a); else return (b);}()
