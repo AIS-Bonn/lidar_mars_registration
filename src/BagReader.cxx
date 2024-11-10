@@ -71,6 +71,7 @@ void BagReader::readCloudBagStamps( std::vector<ros::Time> & bag_stamps, const s
     rosbag::View view ( bag, rosbag::TopicQuery(laser_topic) );
     bag_stamps.clear();
     bag_stamps.reserve(view.size());
+    LOG(1) << "b: " << bag_file_ << " topic: " << laser_topic << " view: " << view.size() << " n: " << numClouds << " s: " << skipFactor;
     int skip = 0;
     const int moduloSkipFactor = std::max<int>(1,skipFactor);
     for ( const rosbag::MessageInstance & m : view )

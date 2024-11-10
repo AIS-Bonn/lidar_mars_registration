@@ -51,7 +51,8 @@ int main(int argc, char *argv[]) {
     loguru::suggest_log_path(PROJECT_SOURCE_DIR, log_path, sizeof(log_path));
     loguru::add_file(log_path, loguru::FileMode::Truncate, loguru::Verbosity_MAX);
 
-    std::string config_file = fs::canonical(fs::path(PROJECT_SOURCE_DIR) / "./config/urban_loco_hk.cfg").string();
+//    std::string config_file = fs::canonical(fs::path(PROJECT_SOURCE_DIR) / "./config/urban_loco_hk.cfg").string();
+    std::string config_file = fs::canonical(fs::path(PROJECT_SOURCE_DIR) / "./config/drz_benchmark_10hz.cfg").string();
 
     std::shared_ptr<Viewer> view = Viewer::create(config_file);  //creates it with default params
     std::shared_ptr<EasyPBRwrapper> wrapper = EasyPBRwrapper::create(config_file, view); // not used right now.
